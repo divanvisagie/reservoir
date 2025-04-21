@@ -1,0 +1,18 @@
+[package]
+name = "reservoir"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio       = { version = "1", features = ["full"] }
+serde       = { version = "1.0", features = ["derive"] }
+serde_json  = "1.0"
+chrono      = "0.4"
+anyhow      = "1.0"   
+hyper = { version = "1", features = ["server", "http1", "client"] }
+hyper-util = { version = "0.1", features = ["tokio", "server"] }
+neo4rs = "0.8.0"
+http-body-util = "0.1"
+bytes = "1"
+http = "1"
+
