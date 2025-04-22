@@ -1,7 +1,10 @@
+# ⚠️ UNDER CONSTRUCTION ⚠️
+This project is currently under active development and is not ready for production use. Features may be incomplete or subject to significant changes.
+
 # reservoir
 
 Reservoir acts as a transparent proxy in front of any OpenAI-compatible API endpoint. Every conversation you have with language models is captured and stored, transforming your 
-Reservoir into a living knowledge base that automatically grows with each interaction you make, whether you’re chatting, prompting, or coding.
+Reservoir into a living knowledge base that automatically grows with each interaction you make, whether you're chatting, prompting, or coding.
 
 <image width="256" src="./docs/logo.png" />
 
