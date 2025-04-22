@@ -16,9 +16,23 @@ Think of Reservoir as your personal neural lake:
 ## How Does It Work?
 
 Reservoir sits between your client app and the actual OpenAI API:
-[Your App] ⇄ [ Reservoir ] ⇄ [ OpenAI API ]- Proxy: Behaves just like the real API to your apps.
-- Recorder: Stores all inbound/outbound traffic—questions, answers, metadata, you name it!
-- Knowledge Base: Over time, Reservoir becomes your own private ChatGPT history, supercharged with search and retrieval.
+```mermaid
+sequenceDiagram
+    participant A as Your App
+    participant B as Reservoir
+    participant C as OpenAI API/Ollama
+    
+    A->>B: API Request
+    B->>C: Forward Request
+    C->>B: Return Response
+    B->>A: Return Response
+    Note over B: Stores conversation data
+    
+```
+
+- **Proxy**: Behaves just like the real API to your apps.
+- **Recorder**: Stores all inbound/outbound traffic—questions, answers, metadata, you name it!
+- **Knowledge Base**: Over time, Reservoir becomes your own private ChatGPT history, supercharged with search and retrieval.
 
 ## Features
 
