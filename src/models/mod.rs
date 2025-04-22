@@ -30,7 +30,7 @@ pub struct ErrorResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ErrorDetail {
-    message: String,
+    pub message: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
