@@ -1,7 +1,10 @@
 # reservoir
 
+<image width="256" src="./docs/logo.png" />
+
 Reservoir acts as a transparent proxy in front of any OpenAI-compatible API endpoint. Every conversation you have with language models is captured and stored, transforming your 
 Reservoir into a living knowledge base that automatically grows with each interaction you make, whether you’re chatting, prompting, or coding.
+
 
 ## Why?
 
