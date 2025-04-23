@@ -111,11 +111,11 @@ Here, `your-partition` can be any string you choose to group related conversatio
 Here's how you would make a request using `curl`, mirroring the standard OpenAI API format but targeting Reservoir:
 
 ```sh
-curl http://localhost:3017/v1/chat/completions/my-partition \
+curl http://localhost:3017/v1/chat/completions/my-curl-request \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $OPENAI_API_KEY" \
     -d '{
-        "model": "gpt-4", # Or any model you use
+        "model": "gpt-4",
         "messages": [
             {
                 "role": "user",
