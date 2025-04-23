@@ -95,14 +95,66 @@ Reservoir will now listen on `http://localhost:3017`.
 
 ## 🧠 Usage
 
-Change your API URL to point at Reservoir:
+To use Reservoir, simply change the API endpoint URL in your client application or scripts to point to the Reservoir server instead of the direct OpenAI API URL. Make sure to include a partition name in the path.
 
-- **Instead of**:  
-  `https://api.openai.com/v1/chat/completions`
-- **Use**:  
-  `http://localhost:3017/v1/chat/completions/your-partition`
+**Example:**
 
-`your-partition` can be any string you use to group conversations (like `my-app`, `project-x`, etc).
+-   **Instead of**:
+    `https://api.openai.com/v1/chat/completions`
+-   **Use**:
+    `http://localhost:3017/v1/chat/completions/your-partition`
+
+Here, `your-partition` can be any string you choose to group related conversations (e.g., `my-app`, `project-x`, `user123`).
+
+### Curl Example
+
+Here's how you would make a request using `curl`, mirroring the standard OpenAI API format but targeting Reservoir:
+
+```sh
+curl http://localhost:3017/v1/chat/completions/my-partition \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $OPENAI_API_KEY" \
+    -d '{
+        "model": "gpt-4", # Or any model you use
+        "messages": [
+            {
+                "role": "user",
+                "content": "Write a one-sentence bedtime story about a brave little toaster."
+            }
+        ]
+    }'
+```
+
+### Python Example (using `openai` library)
+
+If you're using the official `openai` Python library, you just need to configure the `base_url` when initializing the client:
+
+```python
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:3017/v1/chat/completions/my-python-app",
+    api_key=os.environ.get("OPENAI_API_KEY")
+)
+
+completion = client.chat.completions.create(
+    model="gpt-4",
+    messages=[
+        {
+            "role": "user",
+            "content": "Write a one-sentence bedtime story about a curious robot."
+        }
+    ]
+)
+print(completion.choices[0].message.content)
+```
+
+**Note:** The request structure (headers, body) is identical to a direct OpenAI call. The only changes are:
+1.  The **URL** points to your Reservoir instance (`http://localhost:3017`).
+2.  The **path** includes your chosen partition (`/v1/chat/completions/my-partition`).
+
+Reservoir will handle forwarding the request (including the `Authorization` header) to the actual OpenAI API and store the conversation under the specified partition.
 
 ## 🏗️ Architecture
 
