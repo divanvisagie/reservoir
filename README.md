@@ -1,64 +1,130 @@
-# ⚠️ UNDER CONSTRUCTION ⚠️
-This project is currently under active development and is not ready for production use. Features may be incomplete or subject to significant changes.
 
-# reservoir
+# ⚠️ Under Construction
 
-Reservoir acts as a transparent proxy in front of any OpenAI-compatible API endpoint. Every conversation you have with language models is captured and stored, transforming your 
-Reservoir into a living knowledge base that automatically grows with each interaction you make, whether you're chatting, prompting, or coding.
+> Reservoir is in active development. It’s not ready for production use yet. Expect breaking changes.
 
-<image width="256" src="./docs/logo.png" />
+# 🧠 Reservoir
 
-## Why?
+Reservoir is a transparent proxy for any OpenAI-compatible API. It captures all your AI conversations and stores them in a Neo4j graph, turning every interaction into a searchable, self-growing knowledge base.
 
-Think of Reservoir as your personal neural lake:  
-- 🗂️ Capture: Every query and response is archived for future use.
-- 🔎 Search & Fetch: Effortlessly retrieve past prompts and answers by topic, keyword, or context.
-- ⚡ Self-building: The more you interact, the smarter and richer your Reservoir becomes.
-- 🔩 Plug-n-play: Drop it in as a gateway and make any OpenAI-powered app on your machine start building knowledge, automagically.
+<p align="center"><img src="./docs/logo.png" width="256" alt="Reservoir Logo"/></p>
 
-## How Does It Work?
+## 💡 Why Reservoir?
 
-Reservoir sits between your client app and the actual OpenAI API:
+Think of it as a personal neural lake:
+- 🗂️ **Capture**: Every prompt and response is logged.
+- 🔍 **Search (coming soon)**: Look up past queries by topic, keyword, or context.
+- ⚡ **Self-building**: Your interactions enrich the system.
+- 🔌 **Plug-and-Play**: Drop it in front of your OpenAI-compatible app—no client code changes needed.
+
+## 🔧 How It Works
+
+Reservoir sits between your app and the actual LLM service (OpenAI, Ollama, etc.):
+
 ```mermaid
 sequenceDiagram
-    participant A as Your App
-    participant B as Reservoir
-    participant C as OpenAI API/Ollama
-    
-    A->>B: API Request
-    B->>C: Forward Request
-    C->>B: Return Response
-    B->>A: Return Response
-    Note over B: Stores conversation data
-    
+    participant App
+    participant Reservoir
+    participant LLM as OpenAI/Ollama
+
+    App->>Reservoir: Request (e.g. /v1/chat/completions/my-project)
+    Reservoir->>Reservoir: Tag with Trace ID + Partition
+    Reservoir->>Neo4j: Store request
+    Reservoir->>LLM: Forward request
+    LLM->>Reservoir: Return response
+    Reservoir->>Neo4j: Store response
+    Reservoir->>App: Return response
 ```
 
-- **Proxy**: Behaves just like the real API to your apps.
-- **Recorder**: Stores all inbound/outbound traffic—questions, answers, metadata, you name it!
-- **Knowledge Base**: Over time, Reservoir becomes your own private ChatGPT history, supercharged with search and retrieval.
+## 🔍 Features
 
-## Features
+- 📖 Logs all request/response traffic
+- 🔌 OpenAI-compatible
+- 🏷️ Partitioning via URL path (group by project or app)
+- 🗖️ Traceable interactions with unique request IDs
+- 🔸 Stored in Neo4j for rich graph querying
 
-- 📖 Full logging & history search
-- 🔌 Compatible with OpenAI API clients (Both OpenAI and Ollama)
+## 🚀 Getting Started (Development Setup)
 
-## Data Model
+Reservoir is currently intended for local development use. You’ll run the app manually, but we provide a `docker-compose.yml` file to spin up the Neo4j database easily.
 
-### Trace IDs & Partitions
+### Step 1: Clone the Repository
 
-Reservoir organizes your conversational data using two key concepts:
+```bash
+git clone https://github.com/yourname/reservoir
+cd reservoir
+```
 
-- **Trace ID**: A unique identifier automatically generated for each API request. This allows you to track and retrieve the complete history of a specific conversation or API call. Every message exchanged in a single request-response cycle shares the same trace ID.
+### Step 2: Start Neo4j with Docker Compose
 
-- **Partition**: An optional user-defined namespace that allows you to logically separate your message history. You specify a partition as part of the URL path when making requests to Reservoir, for example:
-  ```
-  http://localhost:3017/v1/chat/completions/project-x
-  ```
-  
-  Where `project-x` is your partition name. This makes it easy to organize conversations by:
-  - Project scope
-  - User identity
-  - Application source
-  - Custom categories
+```bash
+docker-compose up -d
+```
 
-Partitioning gives you flexible control over how your knowledge base is structured and queried, letting you maintain separate conversational histories for different contexts.
+This starts Neo4j on the default `bolt://localhost:7687`.
+
+### Step 3: Set Environment Variables
+
+Create a `.env` file or export the following in your shell:
+
+```env
+RESERVOIR_PORT=3017
+OPENAI_API_KEY=sk-...
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=password
+```
+
+### Step 4: Run Reservoir
+
+```bash
+cargo run
+```
+
+Reservoir will now listen on `http://localhost:3017`.
+
+## 🧠 Usage
+
+Change your API URL to point at Reservoir:
+
+- **Instead of**:  
+  `https://api.openai.com/v1/chat/completions`
+- **Use**:  
+  `http://localhost:3017/v1/chat/completions/your-partition`
+
+`your-partition` can be any string you use to group conversations (like `my-app`, `project-x`, etc).
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart TB
+    Client --> HTTPServer{{HTTP Server}}
+    HTTPServer --> Handler
+    Handler --> Neo4j
+    Handler --> OpenAI
+    OpenAI --> Handler
+    Handler --> HTTPServer
+    HTTPServer --> Client
+```
+
+## 💃️ Storage Model
+
+Conversations are stored in Neo4j as:
+
+- **Nodes** (`MessageNode`): One per message (user/AI)
+  - `trace_id`, `partition`, `role`, `content`, `timestamp`
+- **Trace ID**: Unique per request/response pair
+- **Partition**: Logical namespace from the request URL
+
+## ⚙️ Config Options
+
+Set via environment variables:
+
+| Variable         | Description                       | Default                 |
+|------------------|-----------------------------------|--------------------------|
+| `RESERVOIR_PORT` | Port to serve HTTP requests       | `3017`                  |
+| `OPENAI_API_KEY` | API key for forwarding            | *(Required)*            |
+| `NEO4J_URI`      | Neo4j DB connection URI           | `bolt://localhost:7687` |
+| `NEO4J_USER`     | Neo4j username                    | `neo4j`                 |
+| `NEO4J_PASSWORD` | Neo4j password                    | `password`              |
+
