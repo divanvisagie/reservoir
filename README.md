@@ -50,12 +50,12 @@ Reservoir organizes your conversational data using two key concepts:
 
 - **Trace ID**: A unique identifier automatically generated for each API request. This allows you to track and retrieve the complete history of a specific conversation or API call. Every message exchanged in a single request-response cycle shares the same trace ID.
 
-- **Partition**: A optional user-defined namespace that allows you to logically separate your message history. You can specify a partition parameter in the URL when configuring Reservoir, for example:
+- **Partition**: An optional user-defined namespace that allows you to logically separate your message history. You specify a partition as part of the URL path when making requests to Reservoir, for example:
   ```
-  http://localhost:3017?partition=project-x
+  http://localhost:3017/v1/chat/completions/project-x
   ```
   
-  This makes it easy to organize conversations by:
+  Where `project-x` is your partition name. This makes it easy to organize conversations by:
   - Project scope
   - User identity
   - Application source
