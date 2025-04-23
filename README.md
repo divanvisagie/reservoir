@@ -25,12 +25,21 @@ Reservoir sits between your app and the actual LLM service (OpenAI, Ollama, etc.
 sequenceDiagram
     participant App
     participant Reservoir
+    participant Neo4j
     participant LLM as OpenAI/Ollama
 
     App->>Reservoir: Request (e.g. /v1/chat/completions/my-project)
     Reservoir->>Reservoir: Tag with Trace ID + Partition
-    Reservoir->>Neo4j: Store request
-    Reservoir->>LLM: Forward request
+    Reservoir->>Neo4j: Store original request
+
+    %% --- Context Enrichment Steps (Future Goal) ---
+    Note over Reservoir,Neo4j: Future Goal: Enrich Context
+    Reservoir->>Neo4j: Query for relevant context (vector/graph search)
+    Neo4j-->>Reservoir: Return relevant context
+    Reservoir->>Reservoir: Modify request payload with context
+    %% --- End Enrichment Steps ---
+
+    Reservoir->>LLM: Forward enriched request
     LLM->>Reservoir: Return response
     Reservoir->>Neo4j: Store response
     Reservoir->>App: Return response
