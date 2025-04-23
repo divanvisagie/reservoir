@@ -1,4 +1,4 @@
-use http::header;
+use handler::completions::handle_with_partition;
 use http_body_util::BodyExt;
 use http_body_util::Full;
 use hyper::body::Bytes;
@@ -7,84 +7,36 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
-use models::message_node::MessageNode;
-use models::ChatRequest;
-use repos::message::MessageRepository;
-use repos::message::Neo4jMessageRepository;
 use std::convert::Infallible;
-use std::env;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
-use uuid::Uuid;
 
+mod handler;
 mod models;
 mod repos;
 
-const OPENAI_API_URL: &str = "https://api.openai.com/v1/chat/completions";
-
 async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
     println!("Received request: {} {}", req.method(), req.uri().path());
-    let api_key = env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set");
 
     match (req.method(), req.uri().path()) {
-        (&Method::POST, "/v1/chat/completions") => {
+        (&Method::POST, path) if path.starts_with("/v1/chat/completions/") => {
+            let partition = path.trim_start_matches("/v1/chat/completions/").to_string();
+
             let whole_body = req.into_body().collect().await.unwrap().to_bytes();
-
-            let json_string = String::from_utf8_lossy(&whole_body).to_string();
-            let chat_request_model =
-                ChatRequest::from_json(json_string.as_str()).expect("Valid JSON");
-            let trace_id = Uuid::new_v4().to_string();
-            let partition = Some("test_partition".to_string());
-            let repo = Neo4jMessageRepository::new(
-                "bolt://localhost:7687".to_string(),
-                "neo4j".to_string(),
-                "password".to_string(),
-            );
-            for message in &chat_request_model.messages {
-                let node = MessageNode::from_message(message, trace_id.as_str(), partition.clone());
-                let _save_result = repo.save_message_node(&node).await;
-            }
-
-            // forward the request with reqwest
-            let client = reqwest::Client::new();
-            let response = client
-                .post(OPENAI_API_URL)
-                .header("Content-Type", "application/json")
-                .header(header::AUTHORIZATION, format!("Bearer {}", api_key))
-                .body(whole_body.to_vec())
-                .send()
-                .await
-                .map_err(|e| {
-                    eprintln!("Error sending request to OpenAI: {}", e);
-                    e
-                });
-
-            let response = match response {
-                Ok(response) => response.text().await.unwrap(),
+            let response_bytes = handle_with_partition(&partition, whole_body).await;
+            let response_bytes = match response_bytes {
+                Ok(bytes) => bytes,
                 Err(e) => {
-                    if e.is_timeout() {
-                        eprintln!("The request timed out.");
-                    } else if e.is_connect() {
-                        eprintln!("Failed to connect to the server: {}", e);
-                    } else if e.is_status() {
-                        if let Some(status) = e.status() {
-                            eprintln!("Received HTTP status code: {}", status);
-                        }
-                    }
-
-                    if let Some(url) = e.url() {
-                        eprintln!("URL: {}", url);
-                    }
-                    "".to_string()
+                    eprintln!("Error handling request: {}", e);
+                    return Ok(Response::new(Full::new(Bytes::from(
+                        "Internal Server Error",
+                    ))));
                 }
             };
-
-            println!("Response from OpenAI: {:?}", response);
-
-            Ok(Response::new(Full::new(Bytes::from(response))))
+            Ok(Response::new(Full::new(response_bytes)))
         }
+
         (&Method::POST, "/echo") => {
-            // Use collect() from BodyExt instead of to_bytes
             let whole_body = req.into_body().collect().await.unwrap().to_bytes();
             let body = String::from_utf8_lossy(&whole_body);
             Ok(Response::new(Full::new(Bytes::from(format!(
@@ -92,6 +44,7 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
                 body
             )))))
         }
+
         _ => {
             let mut not_found = Response::new(Full::new(Bytes::from("Not Found")));
             *not_found.status_mut() = StatusCode::NOT_FOUND;

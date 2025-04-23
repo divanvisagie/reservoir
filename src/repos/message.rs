@@ -28,6 +28,13 @@ impl Neo4jMessageRepository {
     pub fn new(uri: String, user: String, pass: String) -> Self {
         Neo4jMessageRepository { uri, user, pass }
     }
+    pub fn default() -> Self {
+        Neo4jMessageRepository {
+            uri: "bolt://localhost:7687".to_string(),
+            user: "neo4j".to_string(),
+            pass: "password".to_string(),
+        }
+    }
     async fn connect(&self) -> Result<Graph, Error> {
         let config = ConfigBuilder::new()
             .uri(self.uri.clone())
@@ -44,12 +51,20 @@ impl MessageRepository for Neo4jMessageRepository {
     async fn save_message_node(&self, message_node: &MessageNode) -> Result<(), Error> {
         let graph = self.connect().await?;
         let q = query(
-            "CREATE (m:MessageNode {trace_id: $trace_id, content: $content, role: $role, timestamp: $timestamp}) RETURN m",
+            r#"CREATE (m:MessageNode {
+                trace_id: $trace_id, 
+                content: $content, 
+                role: $role, 
+                timestamp: $timestamp, 
+                partition: $partition
+            }) RETURN m"#,
         )
         .param("trace_id", message_node.trace_id.clone())
         .param("content", message_node.content.clone())
         .param("timestamp", message_node.timestamp.clone())
-        .param("role", message_node.role.clone());
+        .param("role", message_node.role.clone())
+        .param("partition", message_node.partition.clone());
+
         let mut result = graph.execute(q).await?;
         let row = result.next().await.unwrap().unwrap();
         let _: MessageNode = row.get("m")?;
@@ -119,7 +134,7 @@ mod tests {
 
         let message_node = MessageNode {
             trace_id: "12345".to_string(),
-            partition: None,
+            partition: "default".to_string(),
             role: "user".to_string(),
             content: Some("Hello, world!".to_string()),
             url: None,
@@ -144,14 +159,13 @@ mod tests {
         let first = MessageNode::default()
             .with_trace_id("test-first")
             .with_partition("test");
-        let second = MessageNode::default()
-            .with_trace_id("test-second");
+        let second = MessageNode::default().with_trace_id("test-second");
         repo.save_message_node(&first).await.unwrap();
         repo.save_message_node(&second).await.unwrap();
 
         let partition = None;
         let result = repo.get_messages_for_partition(partition).await;
-        // should be 
+        // should be
         if result.is_err() {
             println!("Error getting messages for partition: {:?}", result);
         }
@@ -159,7 +173,7 @@ mod tests {
         // we should find a result with the test-first traceId
         let messages = result.unwrap();
 
-        assert_eq!(messages.len()> 2, true);
+        assert_eq!(messages.len() > 2, true);
 
         let first_message = messages
             .iter()
@@ -172,10 +186,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(first_message.trace_id, "test-first");
-        assert_eq!(first_message.partition, Some("test".to_string()));
+        assert_eq!(first_message.partition, "test".to_string());
 
         assert_eq!(second_message.trace_id, "test-second");
-        assert_eq!(second_message.partition, None);
+        assert_eq!(second_message.partition, "default");
     }
 
     #[tokio::test]

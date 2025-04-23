@@ -1,11 +1,11 @@
-use serde::{Deserialize, Serialize};
 use crate::models::Message;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct MessageNode {
     // Internal tracking
     pub trace_id: String,
-    pub partition: Option<String>,
+    pub partition: String,
 
     // Actual Languuage model stuff
     pub role: String,
@@ -15,10 +15,16 @@ pub struct MessageNode {
 }
 
 impl MessageNode {
-    pub fn new(trace_id: String, role: String, content: Option<String>, url: Option<String>) -> Self {
+    pub fn new(
+        trace_id: String,
+        partition: String,
+        role: String,
+        content: Option<String>,
+        url: Option<String>,
+    ) -> Self {
         MessageNode {
             trace_id,
-            partition: None,
+            partition,
             role,
             content,
             url,
@@ -29,7 +35,7 @@ impl MessageNode {
     pub fn default() -> Self {
         MessageNode {
             trace_id: "test-traceid".to_string(),
-            partition: None,
+            partition: "default".to_string(),
             role: "user".to_string(),
             content: None,
             url: None,
@@ -43,7 +49,7 @@ impl MessageNode {
     }
 
     pub fn with_partition(mut self, partition: &str) -> Self {
-        self.partition = Some(partition.to_string());
+        self.partition = partition.to_string();
         self
     }
 
@@ -52,10 +58,10 @@ impl MessageNode {
         self
     }
 
-    pub fn from_message(message: &Message, trace_id: &str, partition: Option<String>) -> Self {
+    pub fn from_message(message: &Message, trace_id: &str, partition: &str) -> Self {
         MessageNode {
             trace_id: trace_id.to_string(),
-            partition: partition.clone(),
+            partition: partition.to_string(),
             role: message.role.clone(),
             content: Some(message.content.clone()),
             url: None,
@@ -63,5 +69,3 @@ impl MessageNode {
         }
     }
 }
-
-
