@@ -8,8 +8,10 @@ use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
 use std::convert::Infallible;
+use std::env;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
+use anyhow::Error;
 
 mod handler;
 mod models;
@@ -54,9 +56,15 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Create a proper SocketAddr
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3017));
+async fn main() -> Result<(), Error> {
+    // Get port from environment variable or use default
+    let port = env::var("RESERVOIR_PORT")
+        .unwrap_or_else(|_| "3017".to_string())
+        .parse::<u16>()
+        .unwrap_or(3017);
+    
+    // Create a proper SocketAddr with configurable port
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let listener = TcpListener::bind(addr).await?;
     println!("Listening on http://{}", addr);
 
