@@ -7,13 +7,18 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
-use models::ChatResponse;
+use models::message_node::MessageNode;
+use models::ChatRequest;
+use repos::message::MessageRepository;
+use repos::message::Neo4jMessageRepository;
 use std::convert::Infallible;
 use std::env;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
+use uuid::Uuid;
 
 mod models;
+mod repos;
 
 const OPENAI_API_URL: &str = "https://api.openai.com/v1/chat/completions";
 
@@ -24,6 +29,21 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
     match (req.method(), req.uri().path()) {
         (&Method::POST, "/v1/chat/completions") => {
             let whole_body = req.into_body().collect().await.unwrap().to_bytes();
+
+            let json_string = String::from_utf8_lossy(&whole_body).to_string();
+            let chat_request_model =
+                ChatRequest::from_json(json_string.as_str()).expect("Valid JSON");
+            let trace_id = Uuid::new_v4().to_string();
+            let partition = Some("test_partition".to_string());
+            let repo = Neo4jMessageRepository::new(
+                "bolt://localhost:7687".to_string(),
+                "neo4j".to_string(),
+                "password".to_string(),
+            );
+            for message in &chat_request_model.messages {
+                let node = MessageNode::from_message(message, trace_id.as_str(), partition.clone());
+                let _save_result = repo.save_message_node(&node).await;
+            }
 
             // forward the request with reqwest
             let client = reqwest::Client::new();

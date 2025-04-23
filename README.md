@@ -41,3 +41,24 @@ sequenceDiagram
 
 - 📖 Full logging & history search
 - 🔌 Compatible with OpenAI API clients (Both OpenAI and Ollama)
+
+## Data Model
+
+### Trace IDs & Partitions
+
+Reservoir organizes your conversational data using two key concepts:
+
+- **Trace ID**: A unique identifier automatically generated for each API request. This allows you to track and retrieve the complete history of a specific conversation or API call. Every message exchanged in a single request-response cycle shares the same trace ID.
+
+- **Partition**: A optional user-defined namespace that allows you to logically separate your message history. You can specify a partition parameter in the URL when configuring Reservoir, for example:
+  ```
+  http://localhost:3017?partition=project-x
+  ```
+  
+  This makes it easy to organize conversations by:
+  - Project scope
+  - User identity
+  - Application source
+  - Custom categories
+
+Partitioning gives you flexible control over how your knowledge base is structured and queried, letting you maintain separate conversational histories for different contexts.
