@@ -1,4 +1,3 @@
-
 # ⚠️ Under Construction
 
 > Reservoir is in active development. It’s not ready for production use yet. Expect breaking changes.
@@ -11,10 +10,11 @@ Reservoir is a transparent proxy for any OpenAI-compatible API. It captures all 
 
 ## 💡 Why Reservoir?
 
-Think of it as a personal neural lake:
-- 🗂️ **Capture**: Every prompt and response is logged.
-- 🔍 **Search (coming soon)**: Look up past queries by topic, keyword, or context.
-- ⚡ **Self-building**: Your interactions enrich the system.
+Think of it as a personal neural lake that evolves into an intelligent assistant with memory:
+- 🗂️ **Capture**: Every prompt and response is logged, building a rich history.
+- 🧠 **Dynamic Context Enrichment (Future Goal)**: The core idea is to leverage Neo4j's graph relationships and vector search capabilities. Reservoir aims to dynamically build relevant context from your past interactions (based on semantic similarity and graph connections) and inject it into new prompts *before* they are sent to the AI model. This enrichment provides a seamless experience, making it feel like you're talking to an AI with persistent memory.
+- 🔍 **Search (coming soon)**: Look up past queries by topic, keyword, or context, powered by standard and semantic search.
+- ⚡ **Self-building**: Your interactions continuously enrich the knowledge base.
 - 🔌 **Plug-and-Play**: Drop it in front of your OpenAI-compatible app—no client code changes needed.
 
 ## 🔧 How It Works
@@ -43,6 +43,7 @@ sequenceDiagram
 - 🏷️ Partitioning via URL path (group by project or app)
 - 🗖️ Traceable interactions with unique request IDs
 - 🔸 Stored in Neo4j for rich graph querying
+- 💡 **Future**: Plans to utilize Neo4j vector search for semantic retrieval.
 
 ## 🚀 Getting Started (Development Setup)
 
@@ -115,6 +116,8 @@ Conversations are stored in Neo4j as:
   - `trace_id`, `partition`, `role`, `content`, `timestamp`
 - **Trace ID**: Unique per request/response pair
 - **Partition**: Logical namespace from the request URL
+
+Neo4j is chosen specifically for its graph capabilities, which allow modeling the relationships *between* conversations and messages, and its potential to leverage built-in vector search features. This combination is key to the future goal of dynamically building and enriching prompt contexts based on semantic understanding and historical connections, effectively giving the AI a searchable memory.
 
 ## ⚙️ Config Options
 
