@@ -29,7 +29,7 @@ pub struct Message {
 pub struct ChatResponse {
     pub id: String,
     pub object: String,
-    pub created: u64,
+    pub created: i64,
     pub model: String,
     pub usage: Usage,
     pub choices: Vec<Choice>,
@@ -39,7 +39,7 @@ impl ChatResponse {
     pub fn new(
         id: String,
         object: String,
-        created: u64,
+        created: i64,
         model: String,
         usage: Usage,
         choices: Vec<Choice>,
@@ -71,9 +71,9 @@ pub struct ErrorDetail {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Usage {
-    pub prompt_tokens: u64,
-    pub completion_tokens: u64,
-    pub total_tokens: u64,
+    pub prompt_tokens: i64,
+    pub completion_tokens: i64,
+    pub total_tokens: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
