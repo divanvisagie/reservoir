@@ -271,7 +271,7 @@ pub async fn handle_with_partition(
         .get_last_messages_for_partition_and_instance(
             partition.to_string(),
             instance.to_string(),
-            15, // Number of last messages to fetch
+            10, // Number of last messages to fetch
         )
         .await
         .unwrap_or_else(|e| {
