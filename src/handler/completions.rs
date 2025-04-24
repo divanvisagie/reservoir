@@ -352,8 +352,6 @@ pub async fn handle_with_partition(
         // Optionally save the raw error response?
     }
 
-    println!("Response from OpenAI: {:?}", response_text);
-
     Ok(Bytes::from(response_text))
 }
 
