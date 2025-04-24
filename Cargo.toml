@@ -17,4 +17,5 @@ bytes = "1"
 http = "1"
 reqwest = { version = "0.12.15", features = ["json"] }
 uuid = { version = "1.16.0", features = ["v4"] }
+hyper-tls = "0.6.0"
 

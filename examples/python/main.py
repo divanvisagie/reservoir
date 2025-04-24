@@ -2,7 +2,7 @@ import os
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:3017/v1/chat/completions/my-python-app",
+    base_url="http://localhost:3017/v1/partition/my-python-app",
     api_key=os.environ.get("OPENAI_API_KEY")
 )
 

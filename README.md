@@ -111,7 +111,7 @@ Here, `your-partition` can be any string you choose to group related conversatio
 Here's how you would make a request using `curl`, mirroring the standard OpenAI API format but targeting Reservoir:
 
 ```sh
-curl http://localhost:3017/v1/chat/completions/my-curl-request \
+curl "http://localhost:3017/v1/partition/curl/instance/$USER/chat/completions" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $OPENAI_API_KEY" \
     -d '{
@@ -134,7 +134,7 @@ import os
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:3017/v1/chat/completions/my-python-app",
+    base_url="http://localhost:3017/v1/partition/my-python-app",
     api_key=os.environ.get("OPENAI_API_KEY")
 )
 

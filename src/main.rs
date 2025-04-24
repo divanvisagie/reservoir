@@ -1,3 +1,4 @@
+use anyhow::Error;
 use handler::completions::handle_with_partition;
 use http_body_util::BodyExt;
 use http_body_util::Full;
@@ -11,21 +12,49 @@ use std::convert::Infallible;
 use std::env;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
-use anyhow::Error;
 
+mod clients;
 mod handler;
 mod models;
 mod repos;
+
+fn get_partition_from_path(path: &str) -> String {
+    path.strip_prefix("/v1/partition/")
+        .and_then(|rest| rest.split('/').next())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "default".to_string())
+}
+
+fn get_instance_from_path(path: &str) -> Option<String> {
+    let parts: Vec<&str> = path.strip_prefix("/v1/partition/")?.split('/').collect();
+    if parts.len() >= 3 && parts[1] == "instance" {
+        Some(parts[2].to_string())
+    } else {
+        None
+    }
+}
+
+fn is_chat_request(path: &str) -> bool {
+    path.contains("/chat/completions") || path.starts_with("/v1/partition/")
+}
 
 async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
     println!("Received request: {} {}", req.method(), req.uri().path());
 
     match (req.method(), req.uri().path()) {
-        (&Method::POST, path) if path.starts_with("/v1/chat/completions/") => {
-            let partition = path.trim_start_matches("/v1/chat/completions/").to_string();
+        (&Method::POST, path) if path.starts_with("/v1/") => {
+            if !is_chat_request(path) {
+                let mut not_found = Response::new(Full::new(Bytes::from("Not Found")));
+                *not_found.status_mut() = StatusCode::NOT_FOUND;
+                return Ok(not_found);
+            }
+            let partition = get_partition_from_path(path);
+            println!("Partition: {}", partition);
+            let instance = get_instance_from_path(path);
+            println!("Instance: {:?}", instance);
 
             let whole_body = req.into_body().collect().await.unwrap().to_bytes();
-            let response_bytes = handle_with_partition(&partition, whole_body).await;
+            let response_bytes = handle_with_partition(partition.as_str(), instance, whole_body).await;
             let response_bytes = match response_bytes {
                 Ok(bytes) => bytes,
                 Err(e) => {
@@ -62,7 +91,7 @@ async fn main() -> Result<(), Error> {
         .unwrap_or_else(|_| "3017".to_string())
         .parse::<u16>()
         .unwrap_or(3017);
-    
+
     // Create a proper SocketAddr with configurable port
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let listener = TcpListener::bind(addr).await?;

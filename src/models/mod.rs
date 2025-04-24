@@ -35,6 +35,30 @@ pub struct ChatResponse {
     pub choices: Vec<Choice>,
 }
 
+impl ChatResponse {
+    pub fn new(
+        id: String,
+        object: String,
+        created: u64,
+        model: String,
+        usage: Usage,
+        choices: Vec<Choice>,
+    ) -> Self {
+        ChatResponse {
+            id,
+            object,
+            created,
+            model,
+            usage,
+            choices,
+        }
+    }
+
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ErrorResponse {
     pub error: ErrorDetail,
