@@ -6,7 +6,7 @@
 
 Reservoir is a transparent proxy for any OpenAI-compatible API. It captures all your AI conversations and stores them in a Neo4j graph, turning every interaction into a searchable, self-growing knowledge base.
 
-<p align="center"><img src="./docs/logo.png" width="256" alt="Reservoir Logo"/></p>
+<p align="center"><img src="./docs/logo_2d.png" width="256" alt="Reservoir Logo"/></p>
 
 ## 💡 Why Reservoir?
 
