@@ -10,9 +10,13 @@ pub trait MessageRepository {
         trace_id: &str,
         partition: &str,
         instance: &str,
-        top_k: i64,
+        top_k: usize,
     ) -> Result<Vec<MessageNode>, Error>;
+
+    #[allow(dead_code)]
     async fn get_message_node(&self, trace_id: &str) -> Result<MessageNode, Error>;
+
+    #[allow(dead_code)]
     async fn get_messages_for_partition(
         &self,
         partition: Option<&str>,
@@ -21,8 +25,10 @@ pub trait MessageRepository {
         &self,
         partition: String,
         instance: String,
-        count: i32,
+        count: usize,
     ) -> Result<Vec<MessageNode>, Error>;
+
+    #[allow(dead_code)]
     async fn delete_message_node(&self, trace_id: &str) -> Result<i32, Error>;
 }
 
@@ -33,9 +39,6 @@ pub struct Neo4jMessageRepository {
 }
 
 impl Neo4jMessageRepository {
-    pub fn new(uri: String, user: String, pass: String) -> Self {
-        Neo4jMessageRepository { uri, user, pass }
-    }
     pub fn default() -> Self {
         Neo4jMessageRepository {
             uri: "bolt://localhost:7687".to_string(),
@@ -176,7 +179,7 @@ impl MessageRepository for Neo4jMessageRepository {
         trace_id: &str,
         partition: &str,
         instance: &str,
-        top_k: i64,
+        top_k: usize,
     ) -> Result<Vec<MessageNode>, Error> {
         let graph = self.connect().await?;
 
@@ -204,7 +207,7 @@ impl MessageRepository for Neo4jMessageRepository {
             .execute(
                 query(query_text)
                     .param("embedding", embedding)
-                    .param("topK", top_k)
+                    .param("topK", top_k as i64)
                     .param("traceId", trace_id)
                     .param("partition", partition)
                     .param("instance", instance),
@@ -232,7 +235,7 @@ impl MessageRepository for Neo4jMessageRepository {
         &self,
         partition: String,
         instance: String,
-        count: i32,
+        count: usize,
     ) -> Result<Vec<MessageNode>, Error> {
         let graph = self.connect().await?;
         let q = format!(
@@ -258,11 +261,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_message_node() {
-        let repo = Neo4jMessageRepository::new(
-            "bolt://localhost:7687".to_string(),
-            "neo4j".to_string(),
-            "password".to_string(),
-        );
+        let repo = Neo4jMessageRepository::default();
 
         let message_node = MessageNode {
             embedding: vec![],
@@ -283,17 +282,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_messages_for_trace_id() {
-        let repo = Neo4jMessageRepository::new(
-            "bolt://localhost:7687".to_string(),
-            "neo4j".to_string(),
-            "password".to_string(),
-        );
+        let repo = Neo4jMessageRepository::default();
 
         // add some messages to get
-        let first = MessageNode::default()
-            .with_trace_id("test-first")
-            .with_partition("test");
-        let second = MessageNode::default().with_trace_id("test-second");
+        let mut first = MessageNode::default();
+        first.trace_id = "test-first".to_string();
+        first.partition = "test".to_string();
+        let mut second = MessageNode::default();
+        second.trace_id = "test-second".to_string();
         repo.save_message_node(&first).await.unwrap();
         repo.save_message_node(&second).await.unwrap();
 
@@ -328,11 +324,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_message_node() {
-        let repo = Neo4jMessageRepository::new(
-            "bolt://localhost:7687".to_string(),
-            "neo4j".to_string(),
-            "password".to_string(),
-        );
+        let repo = Neo4jMessageRepository::default();
 
         let trace_id = "12345";
         let result = repo.delete_message_node(trace_id).await;
@@ -348,11 +340,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_find_similar_messages() {
-        let repo = Neo4jMessageRepository::new(
-            "bolt://localhost:7687".to_string(),
-            "neo4j".to_string(),
-            "password".to_string(),
-        );
+        let repo = Neo4jMessageRepository::default();
 
         //insert some test messages
         let message_node = MessageNode {

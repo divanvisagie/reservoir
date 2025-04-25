@@ -1,22 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 pub mod message_node;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ChatRequest {
-    pub model: String,
-    pub messages: Vec<Message>,
-}
-
-impl ChatRequest {
-    pub fn new(model: String, messages: Vec<Message>) -> Self {
-        ChatRequest { model, messages }
-    }
-
-    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str(json)
-    }
-}
+pub mod chat_request;
+pub mod chat_response;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Message {
@@ -24,40 +10,6 @@ pub struct Message {
     pub content: String,
 }
 
-// response
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ChatResponse {
-    pub id: String,
-    pub object: String,
-    pub created: i64,
-    pub model: String,
-    pub usage: Usage,
-    pub choices: Vec<Choice>,
-}
-
-impl ChatResponse {
-    pub fn new(
-        id: String,
-        object: String,
-        created: i64,
-        model: String,
-        usage: Usage,
-        choices: Vec<Choice>,
-    ) -> Self {
-        ChatResponse {
-            id,
-            object,
-            created,
-            model,
-            usage,
-            choices,
-        }
-    }
-
-    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str(json)
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ErrorResponse {

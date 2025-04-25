@@ -1,3 +1,4 @@
+use anyhow::Error;
 use reqwest::header;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -24,12 +25,9 @@ struct EmbeddingRequest {
     model: String,
 }
 
-pub async fn get_embeddings_for_text(text: &str) -> EmbeddingResponse {
-    // set up the API client
+pub async fn get_embeddings_for_text(text: &str) -> Result<EmbeddingResponse, Error> {
     let client = reqwest::Client::new();
-
-    // Retrieve the API key from the environment variables
-    let api_key = env::var("OPENAI_API_KEY").expect("Missing OPENAI_API_KEY environment variable");
+    let api_key = env::var("OPENAI_API_KEY")?;
 
     // Set up the request payload
     let request_body = EmbeddingRequest {
@@ -61,8 +59,8 @@ pub async fn get_embeddings_for_text(text: &str) -> EmbeddingResponse {
         Ok(res) => {
             if res.status().is_success() {
                 let embeddings: EmbeddingResponse =
-                    res.json().await.expect("Failed to parse embeddings");
-                embeddings
+                    res.json().await?;
+                Ok(embeddings)
             } else {
                 eprintln!("Error: Received non-success status code {}", res.status());
                 let error_response: serde_json::Value =

@@ -50,11 +50,12 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
             }
             let partition = get_partition_from_path(path);
             println!("Partition: {}", partition);
-            let instance = get_instance_from_path(path);
-            println!("Instance: {:?}", instance);
+            let instance = get_instance_from_path(path).unwrap_or(partition.clone());
+            println!("Instance: {}", instance);
 
             let whole_body = req.into_body().collect().await.unwrap().to_bytes();
-            let response_bytes = handle_with_partition(partition.as_str(), instance, whole_body).await;
+            let response_bytes =
+                handle_with_partition(partition.as_str(), instance.as_str(), whole_body).await;
             let response_bytes = match response_bytes {
                 Ok(bytes) => bytes,
                 Err(e) => {

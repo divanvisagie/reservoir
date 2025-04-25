@@ -2,25 +2,24 @@ use anyhow::Error;
 use std::{collections::HashSet, env};
 use tiktoken_rs::o200k_base;
 
+use crate::models::chat_response::ChatResponse;
 use crate::{
     clients::embeddings::get_embeddings_for_text,
-    models::{ChatResponse, Choice, Message, Usage},
+    models::{chat_request::enrich_chat_request, Choice, Message, Usage},
     repos::message::MessageRepository,
 };
 use bytes::Bytes;
 use http::header;
 use uuid::Uuid;
 
-use crate::{
-    models::{message_node::MessageNode, ChatRequest},
-    repos::message::Neo4jMessageRepository,
-};
+use crate::models::chat_request::ChatRequest;
+use crate::{models::message_node::MessageNode, repos::message::Neo4jMessageRepository};
 
 const OPENAI_API_URL: &str = "https://api.openai.com/v1/chat/completions";
-const MAX_TOKENS: usize = 64_000; 
+const MAX_TOKENS: usize = 64_000;
+const SIMILAR_MESSAGES_LIMIT: usize = 10;
+const LAST_MESSAGES_LIMIT: usize = 15;
 
-// Helper function to estimate tokens for chat messages
-// Based on OpenAI cookbook examples
 fn count_chat_tokens(messages: &[Message]) -> usize {
     let bpe = o200k_base().unwrap(); // Or handle error appropriately
     let mut num_tokens = 0;
@@ -45,7 +44,6 @@ fn count_single_message_tokens(message: &Message) -> usize {
     num_tokens
 }
 
-// Helper function to truncate messages if over token limit, preserving ALL system messages
 fn truncate_messages_if_needed(messages: &mut Vec<Message>, limit: usize) {
     let mut current_tokens = count_chat_tokens(messages);
 
@@ -123,68 +121,28 @@ fn get_last_message_in_chat_request(chat_request: &ChatRequest) -> Option<&str> 
     None
 }
 
-fn enrich_chat_request(
-    mut similar_messages: Vec<MessageNode>,
-    mut last_messages: Vec<MessageNode>, // Add `mut` here
-    chat_request: &mut ChatRequest,
-) {
-    // Define enrichment prompts
-    let semantic_prompt = "The following is the result of a semantic search of the most related messages by cosine similarity to previous conversations";
-    let recent_prompt = "The following are the most recent messages in the conversation";
-
-    // Prepare set of (role, content) for deduplication
-    let existing: HashSet<(String, String)> = chat_request
-        .messages
-        .iter()
-        .map(|m| (m.role.clone(), m.content.clone()))
-        .collect();
-
-    // Remove any similar messages that already exist in the chat
-    similar_messages.retain(|m| {
-        let msg = MessageNode::to_message(m);
-        !existing.contains(&(msg.role.clone(), msg.content.clone()))
-    });
-
-    // Sort similar messages chronologically
-    similar_messages.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-
-    // Sort last messages chronologically
-    last_messages.sort_by(|a, b| a.timestamp.cmp(&b.timestamp)); // Added this line
-
-    // Construct enrichment messages
-    let mut enrichment_block = Vec::new();
-
-    enrichment_block.push(Message {
-        role: "system".to_string(),
-        content: semantic_prompt.to_string(),
-    });
-    enrichment_block.extend(similar_messages.iter().map(MessageNode::to_message));
-    enrichment_block.push(Message {
-        role: "system".to_string(),
-        content: recent_prompt.to_string(),
-    });
-    enrichment_block.extend(last_messages.iter().map(MessageNode::to_message));
-
-    // Find insertion point: after first system message (if exists), else start
-    let insert_index = if chat_request
-        .messages
-        .get(0)
-        .map_or(false, |m| m.role == "system")
-    {
-        1
-    } else {
-        0
-    };
-
-    // Insert enrichment block
-    chat_request
-        .messages
-        .splice(insert_index..insert_index, enrichment_block);
+async fn save_chat_request(
+    chat_request: &ChatRequest,
+    trace_id: &str,
+    partition: &str,
+    instance: &str,
+) -> Result<(), Error> {
+    let repo = Neo4jMessageRepository::default();
+    for message in &chat_request.messages {
+        let embedding = get_embeddings_for_text(message.content.as_str())
+            .await?
+            .data[0]
+            .embedding
+            .clone();
+        let node = MessageNode::from_message(message, trace_id, partition, instance, embedding);
+        repo.save_message_node(&node).await?;
+    }
+    Ok(())
 }
 
 pub async fn handle_with_partition(
     partition: &str,
-    instance: Option<String>,
+    instance: &str,
     whole_body: Bytes,
 ) -> Result<Bytes, Error> {
     let api_key = env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set");
@@ -193,7 +151,6 @@ pub async fn handle_with_partition(
     let trace_id = Uuid::new_v4().to_string();
     let repo = Neo4jMessageRepository::default();
 
-    // ---> START: Check if the last user message is too large <---
     if let Some(last_message) = chat_request_model.messages.last() {
         let last_message_tokens = count_single_message_tokens(last_message);
         if last_message_tokens > MAX_TOKENS {
@@ -237,17 +194,10 @@ pub async fn handle_with_partition(
             return Ok(Bytes::from(response_bytes));
         }
     }
-    // ---> END: Check if the last user message is too large <---
-
-    // --- If the last message is okay, proceed with normal flow ---
 
     let search_term = get_last_message_in_chat_request(&chat_request_model).unwrap_or("");
-    // Handle potential error if embeddings fail
-    let embeddings_result = get_embeddings_for_text(search_term).await;
-    let embeddings = embeddings_result
-        .data[0].embedding.clone();
-
-    let instance = instance.unwrap_or(partition.to_string());
+    let embeddings_result = get_embeddings_for_text(search_term).await?;
+    let embeddings = embeddings_result.data[0].embedding.clone();
 
     // Fetch similar messages only if embeddings were successful
     let similar = if !embeddings.is_empty() {
@@ -255,8 +205,8 @@ pub async fn handle_with_partition(
             embeddings,
             trace_id.as_str(),
             partition,
-            instance.as_str(),
-            5, // Number of similar messages to fetch
+            instance,
+            SIMILAR_MESSAGES_LIMIT, // Number of similar messages to fetch
         )
         .await
         .unwrap_or_else(|e| {
@@ -271,47 +221,32 @@ pub async fn handle_with_partition(
         .get_last_messages_for_partition_and_instance(
             partition.to_string(),
             instance.to_string(),
-            10, // Number of last messages to fetch
+            LAST_MESSAGES_LIMIT, // Number of last messages to fetch
         )
         .await
         .unwrap_or_else(|e| {
             eprintln!("Error finding last messages: {}", e);
             Vec::new() // Return empty vec on error
         });
-
-    // Save incoming messages (consider moving this after successful forwarding?)
-    for message in &chat_request_model.messages {
-        // Skip saving system messages if needed (already handled in repo?)
-        let node = MessageNode::from_message(
-            message,
-            trace_id.as_str(),
-            partition,
-            Some(instance.clone()),
-        )
-        .await;
-        // Log potential save errors but don't necessarily stop the flow
-        if let Err(e) = repo.save_message_node(&node).await {
-            eprintln!("Failed to save incoming message node: {}", e);
-        }
-    }
+    save_chat_request(&chat_request_model, trace_id.as_str(), partition, instance)
+        .await
+        .expect("Could not save the request");
 
     // Enrich the request
-    enrich_chat_request(similar, last_messages, &mut chat_request_model);
+    let enriched_chat_request =
+        enrich_chat_request(similar, last_messages, &mut chat_request_model);
 
     // Truncate if needed
     truncate_messages_if_needed(&mut chat_request_model.messages, MAX_TOKENS);
 
-    // Serialize the potentially enriched and truncated request
-    let whole_body_str =
-        serde_json::to_string(&chat_request_model).expect("Failed to serialize chat request model");
-
-    // forward the request with reqwest
+    let body = serde_json::to_string(&enriched_chat_request)
+        .expect("Failed to serialize chat request model");
     let client = reqwest::Client::new();
     let response = client
         .post(OPENAI_API_URL)
         .header("Content-Type", "application/json")
         .header(header::AUTHORIZATION, format!("Bearer {}", api_key))
-        .body(whole_body_str) // Use the serialized string
+        .body(body) // Use the serialized string
         .send()
         .await;
 
@@ -336,13 +271,18 @@ pub async fn handle_with_partition(
     if let Ok(chat_response) = ChatResponse::from_json(&response_text) {
         if let Some(choice) = chat_response.choices.first() {
             let message = &choice.message;
+            let embedding = get_embeddings_for_text(message.content.as_str())
+                .await?
+                .data[0]
+                .embedding
+                .clone();
             let message_node = MessageNode::from_message(
                 message,
                 trace_id.as_str(),
                 partition,
-                Some(instance.clone()),
-            )
-            .await;
+                instance,
+                embedding,
+            );
             if let Err(e) = repo.save_message_node(&message_node).await {
                 eprintln!("Failed to save response message node: {}", e);
             }
@@ -358,7 +298,8 @@ pub async fn handle_with_partition(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{message_node::MessageNode, ChatRequest, Message};
+    use crate::models::chat_request::ChatRequest;
+    use crate::models::{message_node::MessageNode, Message};
 
     // Helper function to create a dummy MessageNode
     fn create_dummy_node(role: &str, content: &str, timestamp: i64) -> MessageNode {
