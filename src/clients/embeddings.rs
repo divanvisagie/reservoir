@@ -5,6 +5,7 @@ use std::env;
 
 const OPENAI_API_URL: &str = "https://api.openai.com/v1/embeddings"; // Assuming you meant the embeddings endpoint
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct Embedding {
     object: String,
@@ -12,6 +13,7 @@ pub struct Embedding {
     pub embedding: Vec<f32>,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct EmbeddingResponse {
     // Define this struct according to the API response structure for embeddings

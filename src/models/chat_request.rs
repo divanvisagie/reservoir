@@ -21,33 +21,19 @@ impl ChatRequest {
 }
 
 pub fn enrich_chat_request(
-    mut similar_messages: Vec<MessageNode>,
+    similar_messages: Vec<MessageNode>,
     mut last_messages: Vec<MessageNode>, // Add `mut` here
     chat_request: &ChatRequest,
 ) -> ChatRequest {
     let mut chat_request = chat_request.clone();
-    // Define enrichment prompts
-    let semantic_prompt = "The following is the result of a semantic search of the most related messages by cosine similarity to previous conversations";
-    let recent_prompt = "The following are the most recent messages in the conversation";
 
-    // Prepare set of (role, content) for deduplication
-    let existing: HashSet<(String, String)> = chat_request
-        .messages
-        .iter()
-        .map(|m| (m.role.clone(), m.content.clone()))
-        .collect();
+    let semantic_prompt = r#"The following is the result of a semantic search 
+        of the most related messages by cosine similarity to previous 
+        conversations"#;
+    let recent_prompt = r#"The following are the most recent messages in the 
+        conversation in chronological order"#;
 
-    // Remove any similar messages that already exist in the chat
-    similar_messages.retain(|m| {
-        let msg = MessageNode::to_message(m);
-        !existing.contains(&(msg.role.clone(), msg.content.clone()))
-    });
-
-    // Sort similar messages chronologically
-    similar_messages.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-
-    // Sort last messages chronologically
-    last_messages.sort_by(|a, b| a.timestamp.cmp(&b.timestamp)); // Added this line
+    last_messages.sort_by(|a, b| a.timestamp.cmp(&b.timestamp)); 
 
     // Construct enrichment messages
     let mut enrichment_block = Vec::new();

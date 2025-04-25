@@ -2,6 +2,7 @@ use anyhow::Error;
 use std::{collections::HashSet, env};
 use tiktoken_rs::o200k_base;
 
+use crate::clients::llm::LanguageModel;
 use crate::models::chat_response::ChatResponse;
 use crate::{
     clients::embeddings::get_embeddings_for_text,
@@ -15,9 +16,8 @@ use uuid::Uuid;
 use crate::models::chat_request::ChatRequest;
 use crate::{models::message_node::MessageNode, repos::message::Neo4jMessageRepository};
 
-const OPENAI_API_URL: &str = "https://api.openai.com/v1/chat/completions";
 const MAX_TOKENS: usize = 64_000;
-const SIMILAR_MESSAGES_LIMIT: usize = 10;
+const SIMILAR_MESSAGES_LIMIT: usize = 15;
 const LAST_MESSAGES_LIMIT: usize = 15;
 
 fn count_chat_tokens(messages: &[Message]) -> usize {
@@ -115,11 +115,16 @@ fn truncate_messages_if_needed(messages: &mut Vec<Message>, limit: usize) {
     }
 }
 
-fn get_last_message_in_chat_request(chat_request: &ChatRequest) -> Option<&str> {
+fn get_last_message_in_chat_request(chat_request: &ChatRequest) -> Result<&str, Error> {
     if let Some(last_message) = chat_request.messages.last() {
-        return Some(&last_message.content);
+        if last_message.role == "user" {
+            Ok(&last_message.content)
+        } else {
+            Err(Error::msg("Last message is not a user message"))
+        }
+    } else {
+        Err(Error::msg("No messages in chat request"))
     }
-    None
 }
 
 async fn save_chat_request(
@@ -149,54 +154,59 @@ pub async fn handle_with_partition(
     let api_key = env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set");
     let json_string = String::from_utf8_lossy(&whole_body).to_string();
     let mut chat_request_model = ChatRequest::from_json(json_string.as_str()).expect("Valid JSON");
+    let model = LanguageModel::from_str(&chat_request_model.model);
     let trace_id = Uuid::new_v4().to_string();
     let repo = Neo4jMessageRepository::default();
 
-    if let Some(last_message) = chat_request_model.messages.last() {
-        let last_message_tokens = count_single_message_tokens(last_message);
-        if last_message_tokens > MAX_TOKENS {
-            println!(
-                "Last message token count ({}) exceeds limit ({}), returning error response.",
-                last_message_tokens, MAX_TOKENS
-            );
+    let last_message = chat_request_model
+        .messages
+        .last()
+        .expect("There cant be no messages");
+    let last_message_tokens = count_single_message_tokens(last_message);
+    if last_message_tokens > MAX_TOKENS {
+        println!(
+            "Last message token count ({}) exceeds limit ({}), returning error response.",
+            last_message_tokens, MAX_TOKENS
+        );
 
-            // Construct the error message
-            let error_content = format!(
+        // Construct the error message
+        let error_content = format!(
                 "Your last message is too long. It contains approximately {} tokens, which exceeds the maximum limit of {}. Please shorten your message.",
                 last_message_tokens, MAX_TOKENS
             );
-            let error_message = Message {
-                role: "assistant".to_string(),
-                content: error_content,
-            };
+        let error_message = Message {
+            role: "assistant".to_string(),
+            content: error_content,
+        };
 
-            // Create a fake ChatResponse
-            let error_choice = Choice {
-                index: 0,
-                message: error_message,
-                finish_reason: "length".to_string(), // Indicate truncation due to length
-            };
-            let error_response = ChatResponse {
-                id: format!("error-{}", trace_id), // Use trace_id for some uniqueness
-                object: "chat.completion".to_string(),
-                created: chrono::Utc::now().timestamp(), // Safe for recent timestamps
-                model: chat_request_model.model.clone(), // Use the requested model name
-                choices: vec![error_choice],
-                usage: Usage {
-                    // Provide dummy usage stats
-                    prompt_tokens: last_message_tokens as i64, // Indicate the problematic size
-                    completion_tokens: 0,
-                    total_tokens: last_message_tokens as i64,
-                },
-            };
+        // Create a fake ChatResponse
+        let error_choice = Choice {
+            index: 0,
+            message: error_message,
+            finish_reason: "length".to_string(), // Indicate truncation due to length
+        };
+        let error_response = ChatResponse {
+            id: format!("error-{}", trace_id), // Use trace_id for some uniqueness
+            object: "chat.completion".to_string(),
+            created: chrono::Utc::now().timestamp(), // Safe for recent timestamps
+            model: chat_request_model.model.clone(), // Use the requested model name
+            choices: vec![error_choice],
+            usage: Usage {
+                // Provide dummy usage stats
+                prompt_tokens: last_message_tokens as i64, // Indicate the problematic size
+                completion_tokens: 0,
+                total_tokens: last_message_tokens as i64,
+            },
+        };
 
-            // Serialize and return the error response
-            let response_bytes = serde_json::to_vec(&error_response)?;
-            return Ok(Bytes::from(response_bytes));
-        }
+        // Serialize and return the error response
+        let response_bytes = serde_json::to_vec(&error_response)?;
+        return Ok(Bytes::from(response_bytes));
     }
 
-    let search_term = get_last_message_in_chat_request(&chat_request_model).unwrap_or("");
+    let search_term = last_message.content.as_str();
+    get_last_message_in_chat_request(&chat_request_model)?;
+    println!("Using search term: {}", search_term);
     let embeddings_result = get_embeddings_for_text(search_term).await?;
     let embeddings = embeddings_result.data[0].embedding.clone();
 
@@ -236,12 +246,35 @@ pub async fn handle_with_partition(
     let mut enriched_chat_request =
         enrich_chat_request(similar, last_messages, &mut chat_request_model);
     truncate_messages_if_needed(&mut enriched_chat_request.messages, MAX_TOKENS);
+    for message in &enriched_chat_request.messages {
+        if message.role == "system".to_string() {
+            println!(
+                ">> System message content: {}",
+                message.content.chars().take(50).collect::<String>()
+            );
+        } else {
+            println!(
+                "{}, content: {}",
+                message.role,
+                message.content.chars().take(50).collect::<String>()
+            );
+        }
+    }
 
     let body = serde_json::to_string(&enriched_chat_request)
         .expect("Failed to serialize chat request model");
     let client = reqwest::Client::new();
+
+    // get the url out from model
+    let model_url = match model {
+        LanguageModel::GPT4_1(model_info) => model_info.base_url,
+        LanguageModel::GTP4o(model_info) => model_info.base_url,
+        LanguageModel::Llama3_2(model_info) => model_info.base_url,
+        LanguageModel::Unknown(model_info) => model_info.base_url,
+    };
+
     let response = client
-        .post(OPENAI_API_URL)
+        .post(model_url)
         .header("Content-Type", "application/json")
         .header(header::AUTHORIZATION, format!("Bearer {}", api_key))
         .body(body) // Use the serialized string
@@ -288,4 +321,3 @@ pub async fn handle_with_partition(
 
     Ok(Bytes::from(response_text))
 }
-

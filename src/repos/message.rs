@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::models::message_node::MessageNode;
 use anyhow::Error;
 use neo4rs::*;
@@ -47,7 +49,9 @@ impl Neo4jMessageRepository {
         }
     }
 
-    async fn init_vector_index(&self, graph: &Graph, index_name: &str) -> Result<(), Error> {
+    pub async fn init_vector_index(&self) -> Result<(), Error> {
+        let index_name = "messageEmbeddings";
+        let graph = self.connect().await?;
         // Check if index already exists
         let check_query = query("SHOW INDEXES YIELD name RETURN name");
         let mut result = graph.execute(check_query).await?;
@@ -71,11 +75,23 @@ impl Neo4jMessageRepository {
             )",
             index_name
         );
-        let mut result = graph.execute(query(&create_query)).await?;
-        while let Ok(Some(row)) = result.next().await {
-            let name: String = row.get("name")?;
-            if name == index_name {
-                println!("Index {} created successfully", index_name);
+        let result = graph.execute(query(&create_query)).await;
+        match result {
+            Ok(mut rows) => {
+                while let Ok(Some(row)) = rows.next().await {
+                    let name: String = row.get("name")?;
+                    if name == index_name {
+                        println!("Index {} created successfully", index_name);
+                    }
+                }
+            }
+            Err(e) => {
+                // Check if it's the "equivalent index already exists" error and suppress it
+                if format!("{:?}", e).contains("EquivalentSchemaRuleAlreadyExistsException") {
+                    println!("Index '{}' already exists, skipping creation", index_name);
+                } else {
+                    Err(e)?;
+                }
             }
         }
         Ok(())
@@ -88,7 +104,6 @@ impl Neo4jMessageRepository {
             .build()?;
 
         let graph = Graph::connect(config).await?;
-        self.init_vector_index(&graph, "messageEmbeddings").await?;
         Ok(graph)
     }
 }
@@ -183,50 +198,89 @@ impl MessageRepository for Neo4jMessageRepository {
     ) -> Result<Vec<MessageNode>, Error> {
         let graph = self.connect().await?;
 
+        let top_k_extended = (top_k * 3) as i64;
+
         let query_text = "
-            CALL db.index.vector.queryNodes(
-                'messageEmbeddings',
-                $topK,
-                $embedding
-            ) YIELD node, score
-            WITH node, score
-            WHERE node.partition = $partition
-              AND node.instance = $instance
-            RETURN node.trace_id AS trace_id,
-                   node.partition AS partition,
-                   node.instance AS instance,
-                   node.role AS role,
-                   node.content AS content,
-                   node.embedding AS embedding,
-                   node.url AS url,
-                   node.timestamp AS timestamp
-            ORDER BY score DESC
-        ";
+        CALL db.index.vector.queryNodes(
+            'messageEmbeddings',
+            $topKExtended,
+            $embedding
+        ) YIELD node, score
+        WITH node, score
+        WHERE node.partition = $partition
+          AND node.instance = $instance
+          AND node.role = $role
+        RETURN node.trace_id AS trace_id,
+               node.partition AS partition,
+               node.instance AS instance,
+               node.role AS role,
+               node.content AS content,
+               node.embedding AS embedding,
+               node.url AS url,
+               node.timestamp AS timestamp,
+               score
+        ORDER BY score DESC
+    ";
 
         let mut result = graph
             .execute(
                 query(query_text)
                     .param("embedding", embedding)
-                    .param("topK", top_k as i64)
+                    .param("topKExtended", top_k_extended)
                     .param("traceId", trace_id)
                     .param("partition", partition)
-                    .param("instance", instance),
+                    .param("instance", instance)
+                    .param("role", "user"),
             )
             .await?;
 
-        let mut messages = Vec::new();
+        let mut content_map: HashMap<String, (MessageNode, f64)> = HashMap::new();
+
         while let Ok(Some(row)) = result.next().await {
-            messages.push(MessageNode {
+            // Normalize content for deduplication
+            let content_str: Option<String> = row.get("content")?;
+            let content_key = content_str
+                .as_ref()
+                .map(|c| c.to_lowercase().trim().to_string())
+                .unwrap_or_default();
+
+            // Skip empty content
+            if content_key.is_empty() {
+                continue;
+            }
+
+            let score: f64 = row.get("score")?;
+
+            let message = MessageNode {
                 trace_id: row.get("trace_id")?,
                 partition: row.get("partition")?,
                 instance: row.get("instance")?,
                 role: row.get("role")?,
-                content: row.get("content")?,
+                content: content_str.clone(),
                 embedding: row.get("embedding")?,
                 url: row.get("url")?,
                 timestamp: row.get("timestamp")?,
-            });
+            };
+
+            // Only retain highest scoring message for each unique content
+            match content_map.get(&content_key) {
+                Some((_, existing_score)) if *existing_score >= score => {}
+                _ => {
+                    content_map.insert(content_key, (message, score));
+                }
+            }
         }
+
+        // Sort the messages by score descending & take top_k
+        let mut deduped_messages: Vec<_> =
+            content_map.into_iter().map(|(_, (m, s))| (m, s)).collect();
+
+        deduped_messages.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let messages: Vec<MessageNode> = deduped_messages
+            .into_iter()
+            .take(top_k)
+            .map(|(m, _score)| m)
+            .collect();
 
         Ok(messages)
     }

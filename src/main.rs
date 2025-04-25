@@ -8,6 +8,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
+use repos::message::Neo4jMessageRepository;
 use std::convert::Infallible;
 use std::env;
 use std::net::SocketAddr;
@@ -87,13 +88,14 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    // Get port from environment variable or use default
+    let repo = Neo4jMessageRepository::default();
+    repo.init_vector_index().await?;
+
     let port = env::var("RESERVOIR_PORT")
         .unwrap_or_else(|_| "3017".to_string())
         .parse::<u16>()
         .unwrap_or(3017);
 
-    // Create a proper SocketAddr with configurable port
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let listener = TcpListener::bind(addr).await?;
     println!("Listening on http://{}", addr);
@@ -103,7 +105,6 @@ async fn main() -> Result<(), Error> {
         let io = TokioIo::new(stream);
 
         tokio::task::spawn(async move {
-            // Use the hyper_util service_fn
             if let Err(err) = http1::Builder::new()
                 .serve_connection(io, service_fn(handle))
                 .await
