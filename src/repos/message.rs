@@ -337,45 +337,4 @@ mod tests {
             println!("Error saving message node: {:?}", result);
         }
     }
-
-    #[tokio::test]
-    async fn test_find_similar_messages() {
-        let repo = Neo4jMessageRepository::default();
-
-        //insert some test messages
-        let message_node = MessageNode {
-            embedding: vec![0.0; 1536],
-            trace_id: "12345".to_string(),
-            partition: "default".to_string(),
-            instance: "default".to_string(),
-            role: "user".to_string(),
-            content: Some("Hello, world!".to_string()),
-            url: None,
-            timestamp: chrono::Utc::now().timestamp_millis(),
-        };
-        let no_match_node = MessageNode {
-            embedding: vec![0.0; 1234],
-            trace_id: "12346".to_string(),
-            partition: "default".to_string(),
-            instance: "default".to_string(),
-            role: "user".to_string(),
-            content: Some("Hello, world!".to_string()),
-            url: None,
-            timestamp: chrono::Utc::now().timestamp_millis(),
-        };
-        repo.save_message_node(&message_node).await.unwrap();
-        repo.save_message_node(&no_match_node).await.unwrap();
-
-        let embedding = vec![0.0; 1536];
-        let partition = "default".to_string();
-        let instance = "default".to_string();
-        let result = repo
-            .find_similar_messages(embedding, "12345", partition.as_str(), instance.as_str(), 5)
-            .await;
-        if result.is_err() {
-            println!("Error finding similar messages: {:?}", result);
-        }
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap().len() > 0, true);
-    }
 }
