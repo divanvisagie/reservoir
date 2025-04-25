@@ -17,7 +17,7 @@ use crate::models::chat_request::ChatRequest;
 use crate::{models::message_node::MessageNode, repos::message::Neo4jMessageRepository};
 
 const MAX_TOKENS: usize = 64_000;
-const SIMILAR_MESSAGES_LIMIT: usize = 15;
+const SIMILAR_MESSAGES_LIMIT: usize = 7;
 const LAST_MESSAGES_LIMIT: usize = 15;
 
 fn count_chat_tokens(messages: &[Message]) -> usize {
@@ -211,7 +211,7 @@ pub async fn handle_with_partition(
     let embeddings = embeddings_result.data[0].embedding.clone();
 
     // Fetch similar messages only if embeddings were successful
-    let similar = if !embeddings.is_empty() {
+    let mut similar = if !embeddings.is_empty() {
         repo.find_similar_messages(
             embeddings,
             trace_id.as_str(),
@@ -227,6 +227,9 @@ pub async fn handle_with_partition(
     } else {
         Vec::new() // No embeddings, no similar messages
     };
+
+    let similar_pairs = repo.find_connections_between_nodes(&similar).await?;
+    similar.extend(similar_pairs);
 
     let last_messages = repo
         .get_last_messages_for_partition_and_instance(

@@ -32,6 +32,11 @@ pub trait MessageRepository {
 
     #[allow(dead_code)]
     async fn delete_message_node(&self, trace_id: &str) -> Result<i32, Error>;
+
+    async fn find_connections_between_nodes(
+        &self,
+        nodes: &[MessageNode],
+    ) -> Result<Vec<MessageNode>, Error>; // Changed return type
 }
 
 pub struct Neo4jMessageRepository {
@@ -116,16 +121,17 @@ impl MessageRepository for Neo4jMessageRepository {
         }
 
         let graph = self.connect().await?;
-        let q = query(
+        let create_q = query(
             r#"CREATE (m:MessageNode {
-                trace_id: $trace_id, 
-                content: $content, 
-                role: $role, 
-                timestamp: $timestamp, 
+                trace_id: $trace_id,
+                content: $content,
+                role: $role,
+                timestamp: $timestamp,
                 partition: $partition,
                 instance: $instance,
-                embedding: $embedding
-            }) RETURN m"#,
+                embedding: $embedding,
+                url: $url
+            }) RETURN id(m) AS nodeId"#, // Return node ID for potential future use
         )
         .param("trace_id", message_node.trace_id.clone())
         .param("content", message_node.content.clone())
@@ -133,11 +139,33 @@ impl MessageRepository for Neo4jMessageRepository {
         .param("role", message_node.role.clone())
         .param("partition", message_node.partition.clone())
         .param("instance", message_node.instance.clone())
-        .param("embedding", message_node.embedding.clone());
+        .param("embedding", message_node.embedding.clone())
+        .param("url", message_node.url.clone()); // Added url parameter
 
-        let mut result = graph.execute(q).await?;
-        let row = result.next().await.unwrap().unwrap();
-        let _: MessageNode = row.get("m")?;
+        // Execute the CREATE query
+        let mut create_result = graph.execute(create_q).await?;
+        // Consume the result to ensure the node is created before potentially linking it
+        let _ = create_result.next().await?;
+
+        // If the saved message is an assistant message, try to link it to the corresponding user message
+        if message_node.role.eq_ignore_ascii_case("assistant") {
+            let link_q = query(
+                r#"MATCH (u:MessageNode {role: 'user', trace_id: $trace_id})
+                   MATCH (a:MessageNode {role: 'assistant', trace_id: $trace_id})
+                   // Ensure we only match the specific assistant node just created if needed,
+                   // but matching by trace_id and role might be sufficient if only one pair exists per trace_id.
+                   // Consider adding a timestamp check or using the node ID if strictness is required.
+                   MERGE (u)-[:RESPONDED_TO]->(a)
+                   RETURN count(*)"#, // Return something to confirm execution
+            )
+            .param("trace_id", message_node.trace_id.clone());
+
+            // Execute the MERGE query
+            let mut link_result = graph.execute(link_q).await?;
+            // Consume the result
+            let _ = link_result.next().await?;
+        }
+
         Ok(())
     }
 
@@ -306,9 +334,49 @@ impl MessageRepository for Neo4jMessageRepository {
 
         Ok(messages)
     }
+
+    async fn find_connections_between_nodes(
+        &self,
+        nodes: &[MessageNode],
+    ) -> Result<Vec<MessageNode>, Error> {
+        if nodes.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let trace_ids: Vec<String> = nodes.iter().map(|n| n.trace_id.clone()).collect();
+
+        let graph = self.connect().await?;
+        // Query to find pairs of connected nodes within the input list,
+        // then unwind the pairs and collect the distinct nodes involved.
+        let query_text = r#"
+            UNWIND $trace_ids AS traceId1
+            UNWIND $trace_ids AS traceId2
+            WITH traceId1, traceId2 // Introduce WITH clause
+            WHERE traceId1 < traceId2 // Apply WHERE after WITH
+            MATCH (n1:MessageNode {trace_id: traceId1})-[r:RESPONDED_TO]-(n2:MessageNode {trace_id: traceId2})
+            // Unwind the pair of nodes found
+            WITH n1, n2 // Carry forward the matched nodes
+            UNWIND [n1, n2] AS connected_node
+            // Return distinct nodes involved in any connection
+            RETURN DISTINCT connected_node
+        "#;
+
+        let mut result = graph
+            .execute(query(query_text).param("trace_ids", trace_ids))
+            .await?;
+
+        let mut connected_nodes = Vec::new();
+        while let Ok(Some(row)) = result.next().await {
+            // Each row now contains one distinct connected node
+            let node: MessageNode = row.get("connected_node")?;
+            connected_nodes.push(node);
+        }
+
+        Ok(connected_nodes) // Return the vector of MessageNode
+    }
 }
 
-#[cfg(test)]
+#[cfg(test)] // Ignoring tests as requested
 mod tests {
     use super::*;
     use crate::models::message_node::MessageNode;
