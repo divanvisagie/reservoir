@@ -1,10 +1,10 @@
 use anyhow::Error;
 use std::{collections::HashSet, env};
-use tiktoken_rs::cl100k_base; // Use cl100k_base for gpt-3.5-turbo, gpt-4 etc.
+use tiktoken_rs::o200k_base;
 
 use crate::{
     clients::embeddings::get_embeddings_for_text,
-    models::{message_node, ChatResponse, Choice, Message, Usage},
+    models::{ChatResponse, Choice, Message, Usage},
     repos::message::MessageRepository,
 };
 use bytes::Bytes;
@@ -17,12 +17,12 @@ use crate::{
 };
 
 const OPENAI_API_URL: &str = "https://api.openai.com/v1/chat/completions";
-const MAX_TOKENS: usize = 8192; // Example limit for gpt-4 (adjust as needed, leaving buffer)
+const MAX_TOKENS: usize = 64_000; 
 
 // Helper function to estimate tokens for chat messages
 // Based on OpenAI cookbook examples
 fn count_chat_tokens(messages: &[Message]) -> usize {
-    let bpe = cl100k_base().unwrap(); // Or handle error appropriately
+    let bpe = o200k_base().unwrap(); // Or handle error appropriately
     let mut num_tokens = 0;
     for message in messages {
         num_tokens += 4; // Every message follows <|start|>{role/name}\n{content}<|end|>\n
@@ -36,7 +36,7 @@ fn count_chat_tokens(messages: &[Message]) -> usize {
 // Helper function to estimate tokens for a single chat message
 // Slightly simplified version of count_chat_tokens for one message
 fn count_single_message_tokens(message: &Message) -> usize {
-    let bpe = cl100k_base().unwrap(); // Or handle error appropriately
+    let bpe = o200k_base().unwrap(); // Or handle error appropriately
     let mut num_tokens = 0;
     num_tokens += 4; // Overhead for message structure
     num_tokens += bpe.encode_with_special_tokens(&message.role).len();
@@ -359,7 +359,6 @@ pub async fn handle_with_partition(
 mod tests {
     use super::*;
     use crate::models::{message_node::MessageNode, ChatRequest, Message};
-    use std::collections::HashSet;
 
     // Helper function to create a dummy MessageNode
     fn create_dummy_node(role: &str, content: &str, timestamp: i64) -> MessageNode {
