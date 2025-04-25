@@ -21,3 +21,5 @@ target/
 /target
 docs/notes
 ./env
+.DS_Store
+data/
