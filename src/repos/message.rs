@@ -37,7 +37,10 @@ pub trait MessageRepository {
         &self,
         nodes: &[MessageNode],
     ) -> Result<Vec<MessageNode>, Error>; // Changed return type
-
+    async fn find_nodes_connected_to_node(
+        &self,
+        node: &MessageNode,
+    ) -> Result<Vec<MessageNode>, Error>; // Changed return type
     async fn connect_synapses(&self) -> Result<(), Error>;
 }
 
@@ -416,6 +419,26 @@ MERGE (m1)-[:SYNAPSE {score: vector.similarity.cosine(m1.embedding, m2.embedding
         }
 
         Ok(())
+    }
+    async fn find_nodes_connected_to_node(
+        &self,
+        node: &MessageNode,
+    ) -> Result<Vec<MessageNode>, Error> {
+        let graph = self.connect().await?;
+        let q = r#"
+            MATCH p=(m:MessageNode {trace_id: $trace_id})-[:SYNAPSE*1..10]-(n:MessageNode)
+            RETURN nodes(p) AS allNodes
+        "#;
+        let mut result = graph
+            .execute(query(q).param("trace_id", node.trace_id.clone()))
+            .await?;
+    
+        let mut connected_nodes = Vec::new();
+        while let Ok(Some(row)) = result.next().await {
+            let nodes: Vec<MessageNode> = row.get("allNodes")?;
+            connected_nodes.extend(nodes);
+        }
+        Ok(connected_nodes)
     }
 }
 
