@@ -420,6 +420,10 @@ MERGE (m1)-[:SYNAPSE {score: vector.similarity.cosine(m1.embedding, m2.embedding
 
         Ok(())
     }
+
+    /// Finds nodes connected to a given node within a distance of 10 hops.
+    /// Returns a vector of `MessageNode` instances representing the connected nodes.
+    /// The distance is defined by the number of hops in the graph.
     async fn find_nodes_connected_to_node(
         &self,
         node: &MessageNode,

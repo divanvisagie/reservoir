@@ -230,6 +230,22 @@ pub async fn handle_with_partition(
 
     let similar_pairs = repo.find_connections_between_nodes(&similar).await?;
     similar.extend(similar_pairs);
+    let first = similar.first().clone();
+    let similar = match first {
+        Some(first) => {
+            let r = repo.find_nodes_connected_to_node(first).await?;
+            if r.is_empty() {
+                println!("No connected nodes found");
+                similar
+            } else {
+                println!("Found {} connected nodes", r.len());
+                r
+            }
+        }
+        None => {
+            similar
+        }
+    };
 
     let last_messages = repo
         .get_last_messages_for_partition_and_instance(
