@@ -2,7 +2,7 @@ import os
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:3017/v1/partition/my-python-app",
+    base_url=os.environ.get("OPENAI_API_URL"),
     api_key=os.environ.get("OPENAI_API_KEY")
 )
 
@@ -11,7 +11,7 @@ completion = client.chat.completions.create(
     messages=[
         {
             "role": "user",
-            "content": "Write a one-sentence bedtime story about a curious robot."
+            "content": "What is my name?"
         }
     ]
 )

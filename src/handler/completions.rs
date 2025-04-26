@@ -322,5 +322,9 @@ pub async fn handle_with_partition(
         // Optionally save the raw error response?
     }
 
+    repo.connect_synapses()
+        .await
+        .expect("Failed to connect synapses");
+
     Ok(Bytes::from(response_text))
 }

@@ -37,6 +37,8 @@ pub trait MessageRepository {
         &self,
         nodes: &[MessageNode],
     ) -> Result<Vec<MessageNode>, Error>; // Changed return type
+
+    async fn connect_synapses(&self) -> Result<(), Error>;
 }
 
 pub struct Neo4jMessageRepository {
@@ -155,7 +157,7 @@ impl MessageRepository for Neo4jMessageRepository {
                    // Ensure we only match the specific assistant node just created if needed,
                    // but matching by trace_id and role might be sufficient if only one pair exists per trace_id.
                    // Consider adding a timestamp check or using the node ID if strictness is required.
-                   MERGE (u)-[:RESPONDED_TO]->(a)
+                   MERGE (u)-[:RESPONDED_WITH]->(a)
                    RETURN count(*)"#, // Return something to confirm execution
             )
             .param("trace_id", message_node.trace_id.clone());
@@ -353,7 +355,7 @@ impl MessageRepository for Neo4jMessageRepository {
             UNWIND $trace_ids AS traceId2
             WITH traceId1, traceId2 // Introduce WITH clause
             WHERE traceId1 < traceId2 // Apply WHERE after WITH
-            MATCH (n1:MessageNode {trace_id: traceId1})-[r:RESPONDED_TO]-(n2:MessageNode {trace_id: traceId2})
+            MATCH (n1:MessageNode {trace_id: traceId1})-[r:RESPONDED_WITH]-(n2:MessageNode {trace_id: traceId2})
             // Unwind the pair of nodes found
             WITH n1, n2 // Carry forward the matched nodes
             UNWIND [n1, n2] AS connected_node
@@ -373,6 +375,47 @@ impl MessageRepository for Neo4jMessageRepository {
         }
 
         Ok(connected_nodes) // Return the vector of MessageNode
+    }
+
+    async fn connect_synapses(&self) -> Result<(), Error> {
+        /*
+        MATCH (m:MessageNode)
+WITH m
+ORDER BY m.timestamp ASC
+WITH collect(m) AS messages
+UNWIND range(0, size(messages) - 2) AS i
+WITH messages[i] AS m1, messages[i+1] AS m2
+MERGE (m1)-[:SYNAPSE {score: vector.similarity.cosine(m1.embedding, m2.embedding)}]-(m2);
+         */
+        let graph = self.connect().await?;
+        let q = r#"
+            MATCH (m:MessageNode)
+            WITH m
+            ORDER BY m.timestamp ASC
+            WITH collect(m) AS messages
+            UNWIND range(0, size(messages) - 2) AS i
+            WITH messages[i] AS m1, messages[i+1] AS m2
+            MERGE (m1)-[:SYNAPSE {score: vector.similarity.cosine(m1.embedding, m2.embedding)}]-(m2);
+        "#;
+        let mut result = graph.execute(query(q)).await?;
+        while let Ok(Some(row)) = result.next().await {
+            let node: MessageNode = row.get("m")?;
+            println!("Connected nodes: {:?}", node);
+        }
+
+        // now drop all the synapses with a score of < 0.85
+        let q = r#"
+            MATCH (m1:MessageNode)-[r:SYNAPSE]->(m2:MessageNode)
+            WHERE r.score < 0.85
+            DELETE r
+        "#;
+        let mut result = graph.execute(query(q)).await?;
+        while let Ok(Some(row)) = result.next().await {
+            let node: MessageNode = row.get("m")?;
+            println!("Deleted synapse: {:?}", node);
+        }
+
+        Ok(())
     }
 }
 
