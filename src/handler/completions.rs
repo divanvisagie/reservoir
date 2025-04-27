@@ -19,6 +19,20 @@ use crate::{models::message_node::MessageNode, repos::message::Neo4jMessageRepos
 const SIMILAR_MESSAGES_LIMIT: usize = 7;
 const LAST_MESSAGES_LIMIT: usize = 15;
 
+fn deduplicate_message_nodes(
+    message_nodes: Vec<MessageNode>,
+) -> Vec<MessageNode> {
+    let mut unique_nodes = HashSet::new();
+    let mut deduplicated = Vec::new();
+
+    for node in message_nodes {
+        if unique_nodes.insert(node.content.clone()) {
+            deduplicated.push(node);
+        }
+    }
+    deduplicated
+}
+
 fn count_chat_tokens(messages: &[Message]) -> usize {
     let bpe = o200k_base().unwrap(); // Or handle error appropriately
     let mut num_tokens = 0;
@@ -240,6 +254,8 @@ pub async fn handle_with_partition(
     let similar = match first {
         Some(first) => {
             let r = repo.find_nodes_connected_to_node(first).await?;
+            let r = deduplicate_message_nodes(r);
+            
             if r.is_empty() {
                 println!("No connected nodes found");
                 similar

@@ -40,7 +40,7 @@ impl LanguageModel {
                 name: "gpt-4o".to_string(),
                 base_url: openai_base_url(),
             }),
-            "llama3-2" => LanguageModel::Llama3_2(ModelInfo {
+            "llama3.2" => LanguageModel::Llama3_2(ModelInfo {
                 input_tokens: 128_000,
                 output_tokens: 2048,
                 name: "llama3.2".to_string(),

@@ -387,11 +387,13 @@ impl MessageRepository for Neo4jMessageRepository {
         let graph = self.connect().await?;
         let q = r#"
             MATCH (m:MessageNode)
+            WHERE m.embedding IS NOT NULL AND size(m.embedding) = 1536
             WITH m
             ORDER BY m.timestamp ASC
             WITH collect(m) AS messages
             UNWIND range(0, size(messages) - 2) AS i
             WITH messages[i] AS m1, messages[i+1] AS m2
+            WHERE m1.embedding IS NOT NULL AND m2.embedding IS NOT NULL AND size(m1.embedding) = 1536 AND size(m2.embedding) = 1536
             MERGE (m1)-[:SYNAPSE {score: vector.similarity.cosine(m1.embedding, m2.embedding)}]-(m2);
         "#;
         let mut result = graph.execute(query(q)).await?;
