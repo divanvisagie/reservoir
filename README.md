@@ -12,9 +12,9 @@ Reservoir lets you have conversations with multiple AI models and providers, all
 
 ## Table of Contents
 - [Overview](#overview)
-- [Quick Start](#quick-start)
 - [Conversation Threads via Synapses](#conversation-threads-via-synapses)
 - [Documentation](#documentation)
+- [Quick Start](#quick-start)
 - [License](#license)
 
 ## Overview
@@ -47,6 +47,26 @@ sequenceDiagram
 ```
 
 This sequence diagram provides a high-level overview of how Reservoir processes requests and responses.
+
+
+## Conversation Threads via Synapses
+
+Reservoir uses synapse relationships to create “threads” of semantically related messages within the conversation graph. As messages are added, synapses link them sequentially, forming a continuous flow. When the similarity between messages drops below a threshold, the thread is split, marking a topic change. This results in distinct conversation threads, making it easy to visualize and retrieve related exchanges.
+
+You can see an example of this structure in the following graph visualization:
+
+![Conversation Graph View](./docs/conversation_graph_view.png)
+
+## Documentation
+
+Reservoir's documentation is organized into the following sections:
+- [Architecture](./docs/architecture.md): System and component overview.
+- [API](./docs/api.md): API endpoints, usage, and examples.
+- [Data Model](./docs/data_model.md): How data is stored in Neo4j, including the schema.
+- [Development](./docs/dev.md): Setting up the development environment, running locally, and contributing.
+- [Features](./docs/features.md): Key features and future roadmap.
+- [Deployment](./docs/deployment.md): Steps to deploy Reservoir locally or in production.
+- [FAQ](./docs/faq.md): Troubleshooting, common questions, and tips.
 
 ## Quick Start
 
@@ -102,25 +122,6 @@ completion = client.chat.completions.create(
 )
 print(completion.choices[0].message.content)
 ```
-
-## Conversation Threads via Synapses
-
-Reservoir uses synapse relationships to create “threads” of semantically related messages within the conversation graph. As messages are added, synapses link them sequentially, forming a continuous flow. When the similarity between messages drops below a threshold, the thread is split, marking a topic change. This results in distinct conversation threads, making it easy to visualize and retrieve related exchanges.
-
-You can see an example of this structure in the following graph visualization:
-
-![Conversation Graph View](./docs/conversation_graph_view.png)
-
-## Documentation
-
-Reservoir's documentation is organized into the following sections:
-- [Architecture](./docs/architecture.md): System and component overview.
-- [API](./docs/api.md): API endpoints, usage, and examples.
-- [Data Model](./docs/data_model.md): How data is stored in Neo4j, including the schema.
-- [Development](./docs/dev.md): Setting up the development environment, running locally, and contributing.
-- [Features](./docs/features.md): Key features and future roadmap.
-- [Deployment](./docs/deployment.md): Steps to deploy Reservoir locally or in production.
-- [FAQ](./docs/faq.md): Troubleshooting, common questions, and tips.
 
 ## License
 
