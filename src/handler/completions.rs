@@ -16,7 +16,6 @@ use uuid::Uuid;
 use crate::models::chat_request::ChatRequest;
 use crate::{models::message_node::MessageNode, repos::message::Neo4jMessageRepository};
 
-const MAX_TOKENS: usize = 64_000;
 const SIMILAR_MESSAGES_LIMIT: usize = 7;
 const LAST_MESSAGES_LIMIT: usize = 15;
 
@@ -155,6 +154,13 @@ pub async fn handle_with_partition(
     let json_string = String::from_utf8_lossy(&whole_body).to_string();
     let mut chat_request_model = ChatRequest::from_json(json_string.as_str()).expect("Valid JSON");
     let model = LanguageModel::from_str(&chat_request_model.model);
+    // Extract token limits from the model
+    let (input_token_limit, _output_token_limit) = match &model {
+        LanguageModel::GPT4_1(info) => (info.input_tokens, info.output_tokens),
+        LanguageModel::GTP4o(info) => (info.input_tokens, info.output_tokens),
+        LanguageModel::Llama3_2(info) => (info.input_tokens, info.output_tokens),
+        LanguageModel::Unknown(info) => (info.input_tokens, info.output_tokens),
+    };
     let trace_id = Uuid::new_v4().to_string();
     let repo = Neo4jMessageRepository::default();
 
@@ -163,16 +169,16 @@ pub async fn handle_with_partition(
         .last()
         .expect("There cant be no messages");
     let last_message_tokens = count_single_message_tokens(last_message);
-    if last_message_tokens > MAX_TOKENS {
+    if last_message_tokens > input_token_limit {
         println!(
             "Last message token count ({}) exceeds limit ({}), returning error response.",
-            last_message_tokens, MAX_TOKENS
+            last_message_tokens, input_token_limit
         );
 
         // Construct the error message
         let error_content = format!(
                 "Your last message is too long. It contains approximately {} tokens, which exceeds the maximum limit of {}. Please shorten your message.",
-                last_message_tokens, MAX_TOKENS
+                last_message_tokens, input_token_limit
             );
         let error_message = Message {
             role: "assistant".to_string(),
@@ -264,7 +270,8 @@ pub async fn handle_with_partition(
 
     let mut enriched_chat_request =
         enrich_chat_request(similar, last_messages, &mut chat_request_model);
-    truncate_messages_if_needed(&mut enriched_chat_request.messages, MAX_TOKENS);
+    // When truncating, use the model's input_token_limit
+    truncate_messages_if_needed(&mut enriched_chat_request.messages, input_token_limit);
     for message in &enriched_chat_request.messages {
         if message.role == "system".to_string() {
             println!(
