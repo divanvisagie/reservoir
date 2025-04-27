@@ -14,10 +14,14 @@ use std::env;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 
+use args::{Args, SubCommands};
+use clap::Parser;
+
 mod clients;
 mod handler;
 mod models;
 mod repos;
+mod args;
 
 fn get_partition_from_path(path: &str) -> String {
     path.strip_prefix("/v1/partition/")
@@ -86,11 +90,7 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Error> {
-    let repo = Neo4jMessageRepository::default();
-    repo.init_vector_index().await?;
-
+async fn start_server() -> Result<(), Error> {
     let port = env::var("RESERVOIR_PORT")
         .unwrap_or_else(|_| "3017".to_string())
         .parse::<u16>()
@@ -113,4 +113,24 @@ async fn main() -> Result<(), Error> {
             }
         });
     }
+
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+    let args = Args::parse();
+    let repo = Neo4jMessageRepository::default();
+    repo.init_vector_index().await?;
+
+    match args.subcmd {
+        Some(SubCommands::Start(_)) => {
+            start_server().await?;
+        }
+        Some(SubCommands::Config(_config_subcmd)) => {
+            println!("Not yet supported");
+        }
+        None => {
+        }
+    };
+    Ok(())
 }
