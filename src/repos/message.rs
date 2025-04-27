@@ -181,9 +181,12 @@ impl MessageRepository for Neo4jMessageRepository {
             trace_id
         );
         let mut result = graph.execute(query(q.as_str())).await?;
-        let row = result.next().await.unwrap().unwrap();
-        let node: MessageNode = row.get("m")?;
-        Ok(node)
+        if let Some(row) = result.next().await? {
+            let node: MessageNode = row.get("m")?;
+            Ok(node)
+        } else {
+            Err(Error::msg("MessageNode not found"))
+        }
     }
 
     async fn get_messages_for_partition(
@@ -509,15 +512,27 @@ mod tests {
     async fn test_delete_message_node() {
         let repo = Neo4jMessageRepository::default();
 
-        let trace_id = "12345";
+        let trace_id = "test-delete-node";
+        // Ensure the node exists before deleting
+        let message_node = MessageNode {
+            embedding: vec![],
+            trace_id: trace_id.to_string(),
+            partition: "default".to_string(),
+            instance: "default".to_string(),
+            role: "user".to_string(),
+            content: Some("To be deleted".to_string()),
+            url: None,
+            timestamp: chrono::Utc::now().timestamp_millis(),
+        };
+        let _ = repo.save_message_node(&message_node).await;
+
         let result = repo.delete_message_node(trace_id).await;
         if result.is_err() {
             println!("Error deleting message node: {:?}", result);
         }
         assert!(result.is_ok());
         let result = repo.get_message_node(trace_id).await;
-        if result.is_err() {
-            println!("Error saving message node: {:?}", result);
-        }
+        // Should return an error or None, but should not panic
+        assert!(result.is_err(), "Message node should not be found after deletion");
     }
 }
