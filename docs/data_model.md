@@ -19,18 +19,16 @@ Represents a single message (user or assistant).
 
 ## Relationships
 
-- **RESPONDED_WITH**: Links a user message to the corresponding assistant response.
-- **SYNAPSE**: Links semantically similar messages based on vector similarity.
-  - Synapses are created between messages with high semantic similarity.
-  - Synapses with a similarity score below 0.85 are automatically removed to maintain relevance.
+### RESPONDED_WITH
+Links a user message to the corresponding assistant response. This relationship is permanent and ensures data integrity by preserving the original conversation structure.
 
-## Synapse Relationships
+### SYNAPSE
+Links semantically similar messages based on vector similarity. Synapses are dynamic and flexible relationships between messages. The system can create, update, or remove synapses at any time based on the current state of the graph or new data. This ensures that the relationships between messages remain relevant and up-to-date.
 
-Synapses are dynamic and flexible relationships between messages. The system can create, update, or remove synapses at any time based on the current state of the graph or new data. This ensures that the relationships between messages remain relevant and up-to-date.
-
-- **Creation**: Synapses are created between messages with high semantic similarity, using vector similarity scores.
-- **Dynamic Updates**: Synapses with a similarity score below 0.85 are automatically removed to maintain relevance.
-- **Flexibility**: The system can dynamically adjust synapses as new messages are added or as the context evolves.
+- Synapses are initially created sequentially, documenting the continuous flow of conversation over time.
+- If the similarity between consecutive messages drops below the threshold (0.85), the synapse is removed, indicating a topic change in the conversation.
+- Synapses are created between messages with high semantic similarity, using vector similarity scores.
+- The system can dynamically adjust synapses as new messages are added or as the context evolves.
 
 ## Example Graph
 
