@@ -381,15 +381,6 @@ impl MessageRepository for Neo4jMessageRepository {
     }
 
     async fn connect_synapses(&self) -> Result<(), Error> {
-        /*
-        MATCH (m:MessageNode)
-WITH m
-ORDER BY m.timestamp ASC
-WITH collect(m) AS messages
-UNWIND range(0, size(messages) - 2) AS i
-WITH messages[i] AS m1, messages[i+1] AS m2
-MERGE (m1)-[:SYNAPSE {score: vector.similarity.cosine(m1.embedding, m2.embedding)}]-(m2);
-         */
         let graph = self.connect().await?;
         let q = r#"
             MATCH (m:MessageNode)
