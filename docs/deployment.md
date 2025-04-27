@@ -34,7 +34,11 @@ Reservoir is currently intended for local development use. Below are the steps t
    NEO4J_URI=bolt://localhost:7687
    NEO4J_USER=neo4j
    NEO4J_PASSWORD=password
+   RSV_OPENAI_BASE_URL=https://api.openai.com/v1/chat/completions
+   RSV_OLLAMA_BASE_URL=http://localhost:11434/v1/chat/completions
    ```
+
+   > Note: All environment variables except `OPENAI_API_KEY` have sensible defaults if not set. `OPENAI_API_KEY` is required.
 
 4. **Run Reservoir**:
 
