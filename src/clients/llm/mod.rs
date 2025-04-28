@@ -9,6 +9,7 @@ use crate::models::{
 
 const RSV_OPENAI_BASE_URL: &str = "RSV_OPENAI_BASE_URL";
 const RSV_OLLAMA_BASE_URL: &str = "RSV_OLLAMA_BASE_URL";
+const RSV_MISTRAL_BASE_URL: &str = "RSV_MISTRAL_BASE_URL";
 
 fn openai_base_url() -> String {
     env::var(RSV_OPENAI_BASE_URL)
@@ -18,6 +19,11 @@ fn openai_base_url() -> String {
 fn ollama_base_url() -> String {
     env::var(RSV_OLLAMA_BASE_URL)
         .unwrap_or_else(|_| "http://localhost:11434/v1/chat/completions".to_string())
+}
+
+fn mistral_base_url() -> String {
+    env::var(RSV_MISTRAL_BASE_URL)
+        .unwrap_or_else(|_| "https://api.mistral.ai/v1/chat/completions".to_string())
 }
 
 pub struct ModelInfo {
@@ -31,6 +37,7 @@ pub enum LanguageModel {
     GPT4_1(ModelInfo),
     GTP4o(ModelInfo),
     Llama3_2(ModelInfo),
+    MistralLarge2402(ModelInfo),
     Unknown(ModelInfo),
 }
 
@@ -55,6 +62,12 @@ impl LanguageModel {
                 name: "llama3.2".to_string(),
                 base_url: ollama_base_url(),
             }),
+            "mistral-large-2402" => LanguageModel::MistralLarge2402(ModelInfo {
+                input_tokens: 128_000,
+                output_tokens: 2048,
+                name: "mistral-large-2402".to_string(),
+                base_url: mistral_base_url(),
+            }),
             name => LanguageModel::Unknown(ModelInfo {
                 input_tokens: 0,
                 output_tokens: 0,
@@ -76,6 +89,7 @@ pub async fn get_completion_message(
         LanguageModel::GPT4_1(model_info) => model_info.base_url.clone(),
         LanguageModel::GTP4o(model_info) => model_info.base_url.clone(),
         LanguageModel::Llama3_2(model_info) => model_info.base_url.clone(),
+        LanguageModel::MistralLarge2402(model_info) => model_info.base_url.clone(),
         LanguageModel::Unknown(model_info) => model_info.base_url.clone(),
     };
 

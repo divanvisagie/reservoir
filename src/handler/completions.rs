@@ -166,6 +166,7 @@ pub async fn is_last_message_too_big(
         LanguageModel::GPT4_1(model_info) => model_info,
         LanguageModel::GTP4o(model_info) => model_info,
         LanguageModel::Llama3_2(model_info) => model_info,
+        LanguageModel::MistralLarge2402(model_info) => model_info,
         LanguageModel::Unknown(model_info) => model_info,
     };
     let input_token_limit = model.input_tokens;
@@ -227,6 +228,7 @@ pub async fn handle_with_partition(
         LanguageModel::GPT4_1(info) => (info.input_tokens, info.output_tokens),
         LanguageModel::GTP4o(info) => (info.input_tokens, info.output_tokens),
         LanguageModel::Llama3_2(info) => (info.input_tokens, info.output_tokens),
+        LanguageModel::MistralLarge2402(info) => (info.input_tokens, info.output_tokens),
         LanguageModel::Unknown(info) => (info.input_tokens, info.output_tokens),
     };
     let trace_id = Uuid::new_v4().to_string();
