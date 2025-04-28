@@ -192,16 +192,12 @@ pub async fn is_last_message_too_big(
             finish_reason: "length".to_string(), // Indicate truncation due to length
         };
         let error_response = ChatResponse {
-            id: format!("error-{}", trace_id),
-            object: "chat.completion".to_string(),
-            created: chrono::Utc::now().timestamp(),
-            model: model.name.clone(),
+            id: None,
+            object: None,
+            created: None,
+            model: None,
             choices: vec![error_choice],
-            usage: Usage {
-                prompt_tokens: last_message_tokens as i64, // Indicate the problematic size
-                completion_tokens: 0,
-                total_tokens: last_message_tokens as i64,
-            },
+            usage: None,
         };
 
         // Serialize and return the error response

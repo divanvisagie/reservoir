@@ -6,22 +6,22 @@ use super::{Choice, Usage};
 // response
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChatResponse {
-    pub id: String,
-    pub object: String,
-    pub created: i64,
-    pub model: String,
-    pub usage: Usage,
+    pub id: Option<String>,
+    pub object: Option<String>,
+    pub created: Option<i64>,
+    pub model: Option<String>,
+    pub usage: Option<Usage>,
     pub choices: Vec<Choice>,
 }
 
 #[allow(dead_code)]
 impl ChatResponse {
     pub fn new(
-        id: String,
-        object: String,
-        created: i64,
-        model: String,
-        usage: Usage,
+        id: Option<String>,
+        object: Option<String>,
+        created: Option<i64>,
+        model: Option<String>,
+        usage: Option<Usage>,
         choices: Vec<Choice>,
     ) -> Self {
         ChatResponse {
