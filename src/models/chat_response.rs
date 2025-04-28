@@ -14,6 +14,7 @@ pub struct ChatResponse {
     pub choices: Vec<Choice>,
 }
 
+#[allow(dead_code)]
 impl ChatResponse {
     pub fn new(
         id: String,

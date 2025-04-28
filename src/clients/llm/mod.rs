@@ -4,10 +4,8 @@ use anyhow::Error;
 use http::header;
 
 use crate::models::{
-    chat_request::ChatRequest, chat_response::ChatResponse, message_node::MessageNode, Message,
+    chat_request::ChatRequest, chat_response::ChatResponse,
 };
-
-use super::embeddings::get_embeddings_for_text;
 
 const RSV_OPENAI_BASE_URL: &str = "RSV_OPENAI_BASE_URL";
 const RSV_OLLAMA_BASE_URL: &str = "RSV_OLLAMA_BASE_URL";
@@ -87,14 +85,13 @@ pub async fn get_completion_message(
         .post(model_url)
         .header("Content-Type", "application/json")
         .header(header::AUTHORIZATION, format!("Bearer {}", api_key))
-        .body(body) // Use the serialized string
+        .body(body)
         .send()
         .await;
 
     let response_text = match response {
         Ok(resp) => resp.text().await.unwrap_or_else(|e| {
             eprintln!("Error reading response text: {}", e);
-            // Return a default error JSON structure maybe?
             r#"{"error": "Failed to read response text"}"#.to_string()
         }),
         Err(e) => {

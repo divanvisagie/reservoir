@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use serde::{Deserialize, Serialize};
 
 use super::{message_node::MessageNode, Message};
@@ -10,6 +8,7 @@ pub struct ChatRequest {
     pub messages: Vec<Message>,
 }
 
+#[allow(dead_code)]
 impl ChatRequest {
     pub fn new(model: String, messages: Vec<Message>) -> Self {
         ChatRequest { model, messages }

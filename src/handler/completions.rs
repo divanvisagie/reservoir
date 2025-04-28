@@ -1,5 +1,5 @@
 use anyhow::Error;
-use std::{collections::HashSet, env};
+use std::collections::HashSet;
 use tiktoken_rs::o200k_base;
 
 use crate::clients::llm::{get_completion_message, LanguageModel};
@@ -10,7 +10,6 @@ use crate::{
     repos::message::MessageRepository,
 };
 use bytes::Bytes;
-use http::header;
 use uuid::Uuid;
 
 use crate::models::chat_request::ChatRequest;

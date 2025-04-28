@@ -1,23 +1,19 @@
-use std::time::Instant;
-
-use crate::{clients::embeddings::get_embeddings_for_text, models::Message};
+use crate::models::Message;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct MessageNode {
-    // Internal tracking
     pub trace_id: String,
     pub partition: String,
     pub instance: String,
-
-    // Actual Languuage model stuff
-    pub role: String,
     pub content: Option<String>,
+    pub role: String,
     pub embedding: Vec<f32>,
     pub url: Option<String>,
     pub timestamp: i64,
 }
 
+#[allow(dead_code)]
 impl MessageNode {
     pub fn new(
         trace_id: String,
@@ -59,21 +55,6 @@ impl MessageNode {
         }
     }
 
-    // pub fn with_trace_id(mut self, trace_id: &str) -> Self {
-    //     self.trace_id = trace_id.to_string();
-    //     self
-    // }
-    //
-    // pub fn with_partition(mut self, partition: &str) -> Self {
-    //     self.partition = partition.to_string();
-    //     self
-    // }
-    //
-    // pub fn with_url(mut self, url: String) -> Self {
-    //     self.url = Some(url);
-    //     self
-    // }
-    //
     pub fn from_message(
         message: &Message,
         trace_id: &str,
