@@ -27,7 +27,7 @@ struct EmbeddingRequest {
     model: String,
 }
 
-pub async fn get_embeddings_for_text(text: &str) -> Result<EmbeddingResponse, Error> {
+pub async fn get_embeddings_for_text(text: &str) -> Result<Vec<Embedding>, Error> {
     let client = reqwest::Client::new();
     let api_key = env::var("OPENAI_API_KEY")?;
 
@@ -62,7 +62,7 @@ pub async fn get_embeddings_for_text(text: &str) -> Result<EmbeddingResponse, Er
             if res.status().is_success() {
                 let embeddings: EmbeddingResponse =
                     res.json().await?;
-                Ok(embeddings)
+                Ok(embeddings.data)
             } else {
                 eprintln!("Error: Received non-success status code {}", res.status());
                 let error_response: serde_json::Value =

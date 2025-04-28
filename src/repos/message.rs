@@ -402,7 +402,6 @@ impl MessageRepository for Neo4jMessageRepository {
             println!("Connected nodes: {:?}", node);
         }
 
-        // now drop all the synapses with a score of < 0.85
         let q = r#"
             MATCH (m1:MessageNode)-[r:SYNAPSE]->(m2:MessageNode)
             WHERE r.score < 0.85
