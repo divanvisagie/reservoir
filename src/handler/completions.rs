@@ -6,7 +6,7 @@ use crate::clients::llm::{get_completion_message, LanguageModel};
 use crate::models::chat_response::ChatResponse;
 use crate::{
     clients::embeddings::get_embeddings_for_text,
-    models::{chat_request::enrich_chat_request, Choice, Message, Usage},
+    models::{chat_request::enrich_chat_request, Choice, Message},
     repos::message::MessageRepository,
 };
 use bytes::Bytes;

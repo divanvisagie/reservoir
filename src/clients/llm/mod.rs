@@ -2,10 +2,11 @@ use std::env;
 
 use anyhow::Error;
 use http::header;
+use utils::compress_system_context;
 
-use crate::models::{
-    chat_request::ChatRequest, chat_response::ChatResponse,
-};
+pub mod utils;
+
+use crate::models::{chat_request::ChatRequest, chat_response::ChatResponse};
 
 const RSV_OPENAI_BASE_URL: &str = "RSV_OPENAI_BASE_URL";
 const RSV_OLLAMA_BASE_URL: &str = "RSV_OLLAMA_BASE_URL";
@@ -48,7 +49,7 @@ impl LanguageModel {
             "gpt-4.1" => LanguageModel::GPT4_1(ModelInfo {
                 input_tokens: 128_000,
                 output_tokens: 4_096,
-                name: "gpt-4-1".to_string(),
+                name: "gpt-4.1".to_string(),
                 key: env::var("OPENAI_API_KEY").unwrap_or_default(),
                 base_url: openai_base_url(),
             }),
@@ -98,13 +99,25 @@ pub async fn get_completion_message(
         LanguageModel::Unknown(model_info) => model_info.clone(),
     };
 
+    let context = compress_system_context(&chat_request.messages);
+    let chat_request = ChatRequest::new(model_info.name.clone(), context);
+
     let body = match serde_json::to_string(&chat_request) {
         Ok(b) => b,
         Err(e) => {
             eprintln!("Failed to serialize chat request model: {}", e);
-            return Err(Error::msg(format!("Failed to serialize chat request: {}", e)));
+            return Err(Error::msg(format!(
+                "Failed to serialize chat request: {}",
+                e
+            )));
         }
     };
+
+    println!(
+        "Sending request to LLM API: {} -  {}",
+        model_info.name.clone(),
+        model_info.base_url.clone(),
+    );
 
     let response = client
         .post(model_info.base_url.clone())
@@ -119,7 +132,10 @@ pub async fn get_completion_message(
         Ok(resp) => resp,
         Err(e) => {
             eprintln!("Error sending request to LLM API: {}", e);
-            return Err(Error::msg(format!("Failed to send request to LLM API: {}", e)));
+            return Err(Error::msg(format!(
+                "Failed to send request to LLM API: {}",
+                e
+            )));
         }
     };
 
@@ -133,15 +149,27 @@ pub async fn get_completion_message(
     };
 
     if !status.is_success() {
-        eprintln!("LLM API returned error status {}: {}", status, response_text);
-        return Err(Error::msg(format!("LLM API error {}: {}", status, response_text)));
+        eprintln!(
+            "LLM API returned error status {}: {}",
+            status, response_text
+        );
+        return Err(Error::msg(format!(
+            "LLM API error {}: {}",
+            status, response_text
+        )));
     }
 
     match ChatResponse::from_json(&response_text) {
         Ok(r) => Ok(r),
         Err(e) => {
-            eprintln!("Error parsing response JSON: {}\nRaw response: {}", e, response_text);
-            Err(Error::msg(format!("Failed to parse response JSON: {}\nRaw response: {}", e, response_text)))
+            eprintln!(
+                "Error parsing response JSON: {}\nRaw response: {}",
+                e, response_text
+            );
+            Err(Error::msg(format!(
+                "Failed to parse response JSON: {}\nRaw response: {}",
+                e, response_text
+            )))
         }
     }
 }
