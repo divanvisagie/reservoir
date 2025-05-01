@@ -60,6 +60,14 @@ impl LanguageModel {
                 key: env::var("OPENAI_API_KEY").unwrap_or_default(),
                 base_url: openai_base_url(),
             }),
+            //anything that starts with gpt
+            "gpt-4o-mini" => LanguageModel::GTP4o(ModelInfo {
+                input_tokens: 48_000,
+                output_tokens: 4_096,
+                name: model_name.to_string(),
+                key: env::var("OPENAI_API_KEY").unwrap_or_default(),
+                base_url: openai_base_url(),
+            }),
             "llama3.2" => LanguageModel::Llama3_2(ModelInfo {
                 input_tokens: 128_000,
                 output_tokens: 2048,
@@ -75,8 +83,8 @@ impl LanguageModel {
                 base_url: mistral_base_url(),
             }),
             name => LanguageModel::Unknown(ModelInfo {
-                input_tokens: 0,
-                output_tokens: 0,
+                input_tokens: 128_000,
+                output_tokens: 2048,
                 name: name.to_string(),
                 key: "".to_string(),
                 base_url: ollama_base_url(),
