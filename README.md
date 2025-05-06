@@ -4,11 +4,47 @@
 
 # Reservoir
 
-Reservoir is a transparent proxy for any OpenAI-compatible API. It captures all your AI conversations and stores them in a Neo4j graph, turning every interaction into a searchable, self-growing knowledge base.
+## What is Reservoir?
+
+Reservoir is your helpful memory for AI conversations. It sits between your app and the OpenAI Chat Completions API, making it easier to have rich, ongoing conversations with your favorite language models.
+
+### Why does this matter?
+
+When you use the [OpenAI Chat Completions API](https://platform.openai.com/docs/guides/chat), you need to send the full conversation history with every request. For example:
+
+```json
+[
+  {"role": "user", "content": "What is 1 + 1?"},
+  {"role": "assistant", "content": "2"},
+  {"role": "user", "content": "What is the answer times 3?"}
+]
+```
+
+If you only send the last question, the model won’t know what “the answer” refers to. You have to keep track of all previous messages and include them every time.
+
+**This can get tricky as conversations grow!**
+
+Reservoir acts as a smart proxy: it automatically stores your chat history and inserts the right context into each request. You just talk to the API as usual and Reservoir handles the memory, context, and even finds other relevant messages from your past conversations to help the model give better answers.
+
+- No more manual history management
+- Automatic context enrichment
+- Your data stays private and local
+
+### Use Reservoir with Multiple Apps
+
+You can point multiple apps or clients to a single Reservoir instance. This means you can keep context and history across different tools on your computer—like your terminal, a web app, or a chat client. If you want to keep conversations separate, you can use Reservoir’s partitioning feature to organize chats by app, project, or any context you choose.
+
+## Why Use Reservoir?
+
+- **Own your AI history**: All your conversations are stored locally, never in the cloud.
+- **Search and recall**: Instantly find previous chats, ideas, or code snippets from your AI interactions.
+- **Enrich context**: Automatically inject relevant history into new prompts for more coherent, personalized responses.
+- **Visualize conversations**: See how your discussions branch and connect over time.
+- **Stay private**: Your data never leaves your device.
 
 ![Screenshot](docs/logo_256.png)
 
-Reservoir lets you have conversations with multiple AI models and providers, all while keeping your data private and local. Every interaction is stored on your device, building a personal knowledge base that never leaves your network. Enjoy seamless context across chats, switch between models, and own your AI history—no cloud required.
+Reservoir lets you have conversations with multiple AI models and providers, all while keeping your data private and local. Every interaction is stored on your device, building a personal knowledge base that never leaves your network. A single thread of conversation can span multiple models without losing context, allowing you to seamlessly switch between different AI providers while maintaining the flow of your discussion.
 
 ## Table of Contents
 - [Overview](#overview)
