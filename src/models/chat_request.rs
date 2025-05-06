@@ -34,7 +34,6 @@ pub fn enrich_chat_request(
 
     last_messages.sort_by(|a, b| a.timestamp.cmp(&b.timestamp)); 
 
-    // Construct enrichment messages
     let mut enrichment_block = Vec::new();
 
     enrichment_block.push(Message {
@@ -48,7 +47,8 @@ pub fn enrich_chat_request(
     });
     enrichment_block.extend(last_messages.iter().map(MessageNode::to_message));
 
-    // Find insertion point: after first system message (if exists), else start
+    enrichment_block.retain(|m| !m.content.is_empty());
+
     let insert_index = if chat_request
         .messages
         .get(0)
@@ -191,7 +191,6 @@ mod tests {
         let original_len = chat_request.messages.len();
         let chat_request = enrich_chat_request(similar, last, &mut chat_request);
 
-        // Only the two system prompts should be added
         assert_eq!(chat_request.messages.len(), original_len + 2);
         assert_eq!(chat_request.messages[0].role, "system"); // Semantic prompt
         assert_eq!(chat_request.messages[1].role, "system"); // Recent prompt

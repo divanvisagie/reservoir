@@ -27,6 +27,10 @@ fn mistral_base_url() -> String {
         .unwrap_or_else(|_| "https://api.mistral.ai/v1/chat/completions".to_string())
 }
 
+fn gemini_base_url() -> String {
+ "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions".to_string()
+}
+
 pub struct ModelInfo {
     pub input_tokens: usize,
     pub output_tokens: usize,
@@ -36,24 +40,23 @@ pub struct ModelInfo {
 }
 
 pub enum LanguageModel {
-    GPT4_1(ModelInfo),
-    GTP4o(ModelInfo),
-    Llama3_2(ModelInfo),
-    MistralLarge2402(ModelInfo),
-    Unknown(ModelInfo),
+    OpenAi(ModelInfo),
+    Ollama(ModelInfo),
+    Mistral(ModelInfo),
+    Gemini(ModelInfo),
 }
 
 impl LanguageModel {
     pub fn from_str(model_name: &str) -> Self {
         match model_name {
-            "gpt-4.1" => LanguageModel::GPT4_1(ModelInfo {
+            "gpt-4.1" => LanguageModel::OpenAi(ModelInfo {
                 input_tokens: 128_000,
                 output_tokens: 4_096,
                 name: "gpt-4.1".to_string(),
                 key: env::var("OPENAI_API_KEY").unwrap_or_default(),
                 base_url: openai_base_url(),
             }),
-            "gpt-4o" => LanguageModel::GTP4o(ModelInfo {
+            "gpt-4o" => LanguageModel::OpenAi(ModelInfo {
                 input_tokens: 128_000,
                 output_tokens: 4_096,
                 name: "gpt-4o".to_string(),
@@ -61,28 +64,35 @@ impl LanguageModel {
                 base_url: openai_base_url(),
             }),
             //anything that starts with gpt
-            "gpt-4o-mini" => LanguageModel::GTP4o(ModelInfo {
+            "gpt-4o-mini" => LanguageModel::OpenAi(ModelInfo {
                 input_tokens: 48_000,
                 output_tokens: 4_096,
                 name: model_name.to_string(),
                 key: env::var("OPENAI_API_KEY").unwrap_or_default(),
                 base_url: openai_base_url(),
             }),
-            "llama3.2" => LanguageModel::Llama3_2(ModelInfo {
+            "llama3.2" => LanguageModel::Ollama(ModelInfo {
                 input_tokens: 128_000,
                 output_tokens: 2048,
                 name: "llama3.2".to_string(),
                 key: env::var("OPENAI_API_KEY").unwrap_or_default(),
                 base_url: ollama_base_url(),
             }),
-            "mistral-large-2402" => LanguageModel::MistralLarge2402(ModelInfo {
+            "mistral-large-2402" => LanguageModel::Mistral(ModelInfo {
                 input_tokens: 128_000,
                 output_tokens: 2048,
                 name: "mistral-large-2402".to_string(),
                 key: env::var("MISTRAL_API_KEY").unwrap_or_default(),
                 base_url: mistral_base_url(),
             }),
-            name => LanguageModel::Unknown(ModelInfo {
+            "gemini-2.0-flash" => LanguageModel::Gemini(ModelInfo {
+                input_tokens: 128_000,
+                output_tokens: 2048,
+                name: "gemini-2.0-flash".to_string(),
+                key: env::var("GEMINI_API_KEY").unwrap_or_default(),
+                base_url: gemini_base_url(),
+            }),
+            name => LanguageModel::Ollama(ModelInfo {
                 input_tokens: 128_000,
                 output_tokens: 2048,
                 name: name.to_string(),
@@ -100,11 +110,10 @@ pub async fn get_completion_message(
     let client = reqwest::Client::new();
 
     let model_info = match model {
-        LanguageModel::GPT4_1(model_info) => model_info.clone(),
-        LanguageModel::GTP4o(model_info) => model_info.clone(),
-        LanguageModel::Llama3_2(model_info) => model_info.clone(),
-        LanguageModel::MistralLarge2402(model_info) => model_info.clone(),
-        LanguageModel::Unknown(model_info) => model_info.clone(),
+        LanguageModel::Gemini(model_info) => Clone::clone(&model_info),
+        LanguageModel::OpenAi(model_info) => Clone::clone(&model_info),
+        LanguageModel::Mistral(model_info) => Clone::clone(&model_info),
+        LanguageModel::Ollama(model_info) => Clone::clone(&model_info),
     };
 
     let context = compress_system_context(&chat_request.messages);
@@ -122,7 +131,8 @@ pub async fn get_completion_message(
     };
 
     println!(
-        "Sending request to LLM API: {} -  {}",
+        "Sending request to LLM API: {} -  {}\nbody:\n{}",
+        body,
         model_info.name.clone(),
         model_info.base_url.clone(),
     );

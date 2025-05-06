@@ -6,7 +6,7 @@
 
 Reservoir is a transparent proxy for any OpenAI-compatible API. It captures all your AI conversations and stores them in a Neo4j graph, turning every interaction into a searchable, self-growing knowledge base.
 
-<p align="center"><img src="./docs/logo_2d.png" width="256" alt="Reservoir Logo"/></p>
+![Screenshot](docs/logo_256.png)
 
 Reservoir lets you have conversations with multiple AI models and providers, all while keeping your data private and local. Every interaction is stored on your device, building a personal knowledge base that never leaves your network. Enjoy seamless context across chats, switch between models, and own your AI history—no cloud required.
 
@@ -74,9 +74,9 @@ Reservoir provides an OpenAI-compatible API endpoint. You can use your system us
 
 ### Example Usage
 - **Instead of**:
-  `https://api.openai.com/v1/chat/completions`
+  https://api.openai.com/v1/chat/completions
 - **Use**:
-  `http://localhost:3017/v1/partition/$USER/instance/my-application/chat/completions`
+  http://localhost:3017/v1/partition/$USER/instance/my-application/chat/completions
 
 Here, `$USER` is the system username, and `my-application` is the instance. Context enrichment and history retrieval are scoped to the specific `partition`/`instance` combination.
 

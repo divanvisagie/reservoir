@@ -163,11 +163,10 @@ pub async fn is_last_message_too_big(
     trace_id: &str,
 ) -> Option<Bytes> {
     let model = match model {
-        LanguageModel::GPT4_1(model_info) => model_info,
-        LanguageModel::GTP4o(model_info) => model_info,
-        LanguageModel::Llama3_2(model_info) => model_info,
-        LanguageModel::MistralLarge2402(model_info) => model_info,
-        LanguageModel::Unknown(model_info) => model_info,
+        LanguageModel::Ollama(model_info) => model_info,
+        LanguageModel::OpenAi(model_info) => model_info,
+        LanguageModel::Mistral(model_info) => model_info,
+        LanguageModel::Gemini(model_info) => model_info,
     };
     let input_token_limit = model.input_tokens;
     let last_message_tokens = count_single_message_tokens(last_message);
@@ -221,11 +220,10 @@ pub async fn handle_with_partition(
     let model = LanguageModel::from_str(&chat_request_model.model);
 
     let (input_token_limit, _output_token_limit) = match &model {
-        LanguageModel::GPT4_1(info) => (info.input_tokens, info.output_tokens),
-        LanguageModel::GTP4o(info) => (info.input_tokens, info.output_tokens),
-        LanguageModel::Llama3_2(info) => (info.input_tokens, info.output_tokens),
-        LanguageModel::MistralLarge2402(info) => (info.input_tokens, info.output_tokens),
-        LanguageModel::Unknown(info) => (info.input_tokens, info.output_tokens),
+        LanguageModel::Ollama(info) => (info.input_tokens, info.output_tokens),
+        LanguageModel::OpenAi(info) => (info.input_tokens, info.output_tokens),
+        LanguageModel::Mistral(info) => (info.input_tokens, info.output_tokens),
+        LanguageModel::Gemini(info) => (info.input_tokens, info.output_tokens),
     };
     let trace_id = Uuid::new_v4().to_string();
     let repo = Neo4jMessageRepository::default();
@@ -265,7 +263,7 @@ pub async fn handle_with_partition(
             Vec::new()
         })
     } else {
-        Vec::new() 
+        Vec::new()
     };
 
     let similar_pairs = repo.find_connections_between_nodes(&similar).await?;
@@ -284,6 +282,7 @@ pub async fn handle_with_partition(
         }
         None => similar,
     };
+
 
     let last_messages = repo
         .get_last_messages_for_partition_and_instance(
@@ -307,7 +306,7 @@ pub async fn handle_with_partition(
     let chat_response = get_completion_message(&model, &enriched_chat_request)
         .await
         .expect("Failed to get completion message");
-    
+
     let message_node = chat_response.choices.first().unwrap().message.clone();
     let embedding = get_embeddings_for_text(message_node.content.as_str())
         .await?
@@ -320,7 +319,7 @@ pub async fn handle_with_partition(
         trace_id.as_str(),
         partition,
         instance,
-        embedding
+        embedding,
     );
     repo.save_message_node(&message_node)
         .await
@@ -330,7 +329,7 @@ pub async fn handle_with_partition(
         .await
         .expect("Failed to connect synapses");
 
-    let response_text = serde_json::to_string(&chat_response)
-        .expect("Failed to serialize chat response");
+    let response_text =
+        serde_json::to_string(&chat_response).expect("Failed to serialize chat response");
     Ok(Bytes::from(response_text))
 }
