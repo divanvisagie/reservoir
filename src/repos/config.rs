@@ -1,25 +1,64 @@
 use std::env;
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 use once_cell::sync::OnceCell;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use dirs_next::config_dir;
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ReservoirConfig {
+    #[serde(default = "default_neo4j_uri")]
     pub neo4j_uri: Option<String>,
+    #[serde(default = "default_neo4j_user")]
     pub neo4j_user: Option<String>,
+    #[serde(default = "default_neo4j_password")]
     pub neo4j_password: Option<String>,
+}
+
+fn default_neo4j_uri() -> Option<String> {
+    Some("bolt://localhost:7687".to_string())
+}
+fn default_neo4j_user() -> Option<String> {
+    Some("neo4j".to_string())
+}
+fn default_neo4j_password() -> Option<String> {
+    Some("password".to_string())
+}
+
+impl Default for ReservoirConfig {
+    fn default() -> Self {
+        ReservoirConfig {
+            neo4j_uri: default_neo4j_uri(),
+            neo4j_user: default_neo4j_user(),
+            neo4j_password: default_neo4j_password(),
+        }
+    }
 }
 
 static CONFIG: OnceCell<ReservoirConfig> = OnceCell::new();
 
+fn get_reservoir_config_path() -> PathBuf {
+    let mut path = config_dir().unwrap_or_else(|| env::current_dir().unwrap());
+    path.push("reservoir");
+    path.push("reservoir.toml");
+    path
+}
+
 fn load_config_file() -> ReservoirConfig {
-    let path = Path::new("reservoir.toml");
+    let path = get_reservoir_config_path();
+    println!("Loading config from {}", path.display());
     if path.exists() {
-        let content = fs::read_to_string(path).unwrap_or_default();
+        let content = fs::read_to_string(&path).unwrap_or_default();
         toml::from_str(&content).unwrap_or_default()
     } else {
-        ReservoirConfig::default()
+        // Create the directory and file, and write defaults
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let default = ReservoirConfig::default();
+        let toml_str = toml::to_string_pretty(&default).unwrap_or_default();
+        let _ = fs::write(&path, toml_str);
+        default
     }
 }
 
