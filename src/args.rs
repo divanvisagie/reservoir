@@ -27,6 +27,8 @@ pub enum SubCommands {
     Start(StartSubCommand),
     /// Export all message nodes as JSON
     Export,
+    /// Import message nodes from a JSON file
+    Import(ImportSubCommand),
 }
 
 #[derive(Parser, Debug)]
@@ -46,4 +48,11 @@ pub struct ConfigSubCommand {
     /// `cgip config --get model`
     #[arg(short, long)]
     pub get: Option<String>,
+}
+
+#[derive(Parser, Debug)]
+#[command(author, version, about = "Import message nodes from a JSON file", long_about = None)]
+pub struct ImportSubCommand {
+    /// Path to the JSON file to import
+    pub file: String,
 }

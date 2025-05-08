@@ -1,6 +1,6 @@
 # 🚧 Under Construction
 
-> Reservoir is in active development. It’s not ready for production use yet. Expect breaking changes.
+> Reservoir is in active development. It's not ready for production use yet. Expect breaking changes.
 
 # Reservoir
 
@@ -20,7 +20,7 @@ When you use the [OpenAI Chat Completions API](https://platform.openai.com/docs/
 ]
 ```
 
-If you only send the last question, the model won’t know what “the answer” refers to. You have to keep track of all previous messages and include them every time.
+If you only send the last question, the model won't know what "the answer" refers to. You have to keep track of all previous messages and include them every time.
 
 **This can get tricky as conversations grow!**
 
@@ -32,7 +32,7 @@ Reservoir acts as a smart proxy: it automatically stores your chat history and i
 
 ### Use Reservoir with Multiple Apps
 
-You can point multiple apps or clients to a single Reservoir instance. This means you can keep context and history across different tools on your computer—like your terminal, a web app, or a chat client. If you want to keep conversations separate, you can use Reservoir’s partitioning feature to organize chats by app, project, or any context you choose.
+You can point multiple apps or clients to a single Reservoir instance. This means you can keep context and history across different tools on your computer—like your terminal, a web app, or a chat client. If you want to keep conversations separate, you can use Reservoir's partitioning feature to organize chats by app, project, or any context you choose.
 
 ## Why Use Reservoir?
 
@@ -87,7 +87,7 @@ This sequence diagram provides a high-level overview of how Reservoir processes 
 
 ## Conversation Threads via Synapses
 
-Reservoir uses synapse relationships to create “threads” of semantically related messages within the conversation graph. As messages are added, synapses link them sequentially, forming a continuous flow. When the similarity between messages drops below a threshold, the thread is split, marking a topic change. This results in distinct conversation threads, making it easy to visualize and retrieve related exchanges.
+Reservoir uses synapse relationships to create "threads" of semantically related messages within the conversation graph. As messages are added, synapses link them sequentially, forming a continuous flow. When the similarity between messages drops below a threshold, the thread is split, marking a topic change. This results in distinct conversation threads, making it easy to visualize and retrieve related exchanges.
 
 You can see an example of this structure in the following graph visualization:
 
@@ -107,6 +107,24 @@ Reservoir's documentation is organized into the following sections:
 ## Quick Start
 
 Reservoir provides an OpenAI-compatible API endpoint. You can use your system username as the partition and your application name as the instance for best results.
+
+### Import/Export Data
+
+Reservoir supports exporting all message nodes to a JSON file and importing them back into the database. This is useful for backup, migration, or sharing your AI conversation history.
+
+#### Export all message nodes to JSON
+
+```bash
+cargo run -- export > messages.json
+```
+This command prints all message nodes in the database as pretty-printed JSON to stdout. Redirect the output to a file to save it.
+
+#### Import message nodes from a JSON file
+
+```bash
+cargo run -- import path/to/messages.json
+```
+This command reads the specified JSON file (in the same format as the export) and imports all message nodes into the database.
 
 ### Example Usage
 - **Instead of**:

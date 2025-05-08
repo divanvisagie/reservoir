@@ -18,6 +18,7 @@ use tokio::net::TcpListener;
 use args::{Args, SubCommands};
 use clap::Parser;
 use serde_json;
+use std::fs;
 
 mod clients;
 mod handler;
@@ -132,6 +133,15 @@ async fn main() -> Result<(), Error> {
             let messages = repo.get_messages_for_partition(None).await?;
             let json = serde_json::to_string_pretty(&messages)?;
             println!("{}", json);
+        }
+        Some(SubCommands::Import(import_cmd)) => {
+            // Import message nodes from a JSON file
+            let file_content = fs::read_to_string(&import_cmd.file)?;
+            let messages: Vec<models::message_node::MessageNode> = serde_json::from_str(&file_content)?;
+            for message in &messages {
+                repo.save_message_node(message).await?;
+            }
+            println!("Imported {} message nodes from {}", messages.len(), import_cmd.file);
         }
         None => {
         }
