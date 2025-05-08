@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio       = { version = "1", features = ["full"] }
+tokio       = { version = "1.45.0", features = ["full"] }
 serde       = { version = "1.0", features = ["derive"] }
 serde_json  = "1.0"
-chrono      = "0.4"
+chrono      = "0.4.41"
 anyhow      = "1.0"   
 hyper = { version = "1", features = ["server", "http1", "client"] }
 hyper-util = { version = "0.1", features = ["tokio", "server"] }
@@ -21,3 +21,5 @@ hyper-tls = "0.6.0"
 tiktoken-rs = "0.6.0"
 clap = { version = "4.5.37", features = ["derive"] }
 openai = { version = "1.1.0", features = ["reqwest"] }
+once_cell = "1.18"
+toml = "0.8.22"
