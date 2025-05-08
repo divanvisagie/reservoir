@@ -58,7 +58,6 @@ fn get_reservoir_config_path() -> PathBuf {
 
 fn load_config_file() -> ReservoirConfig {
     let path = get_reservoir_config_path();
-    println!("Loading config from {}", path.display());
     if path.exists() {
         let content = fs::read_to_string(&path).unwrap_or_default();
         toml::from_str(&content).unwrap_or_default()

@@ -25,6 +25,8 @@ pub enum SubCommands {
     /// Set or get default configuration values with your config.toml.
     Config(ConfigSubCommand),
     Start(StartSubCommand),
+    /// Export all message nodes as JSON
+    Export,
 }
 
 #[derive(Parser, Debug)]

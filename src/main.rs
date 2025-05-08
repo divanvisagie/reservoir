@@ -8,7 +8,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
-use repos::message::Neo4jMessageRepository;
+use repos::message::{Neo4jMessageRepository, MessageRepository};
 use repos::config::get_reservoir_port;
 use std::convert::Infallible;
 use std::env;
@@ -17,6 +17,7 @@ use tokio::net::TcpListener;
 
 use args::{Args, SubCommands};
 use clap::Parser;
+use serde_json;
 
 mod clients;
 mod handler;
@@ -118,14 +119,19 @@ async fn start_server() -> Result<(), Error> {
 async fn main() -> Result<(), Error> {
     let args = Args::parse();
     let repo = Neo4jMessageRepository::default();
-    repo.init_vector_index().await?;
-
     match args.subcmd {
         Some(SubCommands::Start(_)) => {
+            repo.init_vector_index().await?;
             start_server().await?;
         }
         Some(SubCommands::Config(_config_subcmd)) => {
             println!("Not yet supported");
+        }
+        Some(SubCommands::Export) => {
+            // Export all message nodes as JSON
+            let messages = repo.get_messages_for_partition(None).await?;
+            let json = serde_json::to_string_pretty(&messages)?;
+            println!("{}", json);
         }
         None => {
         }
