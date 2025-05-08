@@ -9,6 +9,7 @@ use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
 use repos::message::Neo4jMessageRepository;
+use repos::config::get_reservoir_port;
 use std::convert::Infallible;
 use std::env;
 use std::net::SocketAddr;
@@ -91,10 +92,7 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
 }
 
 async fn start_server() -> Result<(), Error> {
-    let port = env::var("RESERVOIR_PORT")
-        .unwrap_or_else(|_| "3017".to_string())
-        .parse::<u16>()
-        .unwrap_or(3017);
+    let port = get_reservoir_port();
 
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let listener = TcpListener::bind(addr).await?;
