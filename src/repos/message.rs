@@ -1,10 +1,9 @@
 use std::collections::HashMap;
-use std::env;
 
 use crate::models::message_node::MessageNode;
 use anyhow::Error;
 use neo4rs::*;
-use crate::repos::config::{get_neo4j_uri, get_neo4j_user, get_neo4j_password};
+use crate::repos::config::{get_neo4j_uri, get_neo4j_user, get_neo4j_password, get_neo4j_database};
 
 pub trait MessageRepository {
     async fn save_message_node(&self, message_node: &MessageNode) -> Result<(), Error>;
@@ -50,6 +49,7 @@ pub struct Neo4jMessageRepository {
     uri: String,
     user: String,
     pass: String,
+    database: String,
 }
 
 impl Neo4jMessageRepository {
@@ -58,6 +58,7 @@ impl Neo4jMessageRepository {
             uri: get_neo4j_uri(),
             user: get_neo4j_user(),
             pass: get_neo4j_password(),
+            database: get_neo4j_database(),
         }
     }
 
@@ -108,13 +109,13 @@ impl Neo4jMessageRepository {
         }
         Ok(())
     }
+
     async fn connect(&self) -> Result<Graph, Error> {
         let config = ConfigBuilder::new()
             .uri(self.uri.clone())
             .user(self.user.clone())
             .password(self.pass.clone())
             .build()?;
-
         let graph = Graph::connect(config).await?;
         Ok(graph)
     }
@@ -138,7 +139,7 @@ impl MessageRepository for Neo4jMessageRepository {
                 instance: $instance,
                 embedding: $embedding,
                 url: $url
-            }) RETURN id(m) AS nodeId"#, // Return node ID for potential future use
+            }) RETURN id(m) AS nodeId"#,
         )
         .param("trace_id", message_node.trace_id.clone())
         .param("content", message_node.content.clone())
@@ -147,7 +148,7 @@ impl MessageRepository for Neo4jMessageRepository {
         .param("partition", message_node.partition.clone())
         .param("instance", message_node.instance.clone())
         .param("embedding", message_node.embedding.clone())
-        .param("url", message_node.url.clone()); // Added url parameter
+        .param("url", message_node.url.clone());
 
         // Execute the CREATE query
         let mut create_result = graph.execute(create_q).await?;
@@ -159,11 +160,8 @@ impl MessageRepository for Neo4jMessageRepository {
             let link_q = query(
                 r#"MATCH (u:MessageNode {role: 'user', trace_id: $trace_id})
                    MATCH (a:MessageNode {role: 'assistant', trace_id: $trace_id})
-                   // Ensure we only match the specific assistant node just created if needed,
-                   // but matching by trace_id and role might be sufficient if only one pair exists per trace_id.
-                   // Consider adding a timestamp check or using the node ID if strictness is required.
                    MERGE (u)-[:RESPONDED_WITH]->(a)
-                   RETURN count(*)"#, // Return something to confirm execution
+                   RETURN count(*)"#,
             )
             .param("trace_id", message_node.trace_id.clone());
 
@@ -196,7 +194,6 @@ impl MessageRepository for Neo4jMessageRepository {
         partition: Option<&str>,
     ) -> Result<Vec<MessageNode>, Error> {
         let graph = self.connect().await?;
-
         let q = if let Some(p) = partition {
             query("MATCH (m:MessageNode {partition: $partition}) RETURN m").param("partition", p)
         } else {
@@ -235,9 +232,7 @@ impl MessageRepository for Neo4jMessageRepository {
         top_k: usize,
     ) -> Result<Vec<MessageNode>, Error> {
         let graph = self.connect().await?;
-
         let top_k_extended = (top_k * 3) as i64;
-
         let query_text = "
         CALL db.index.vector.queryNodes(
             'messageEmbeddings',
@@ -259,36 +254,26 @@ impl MessageRepository for Neo4jMessageRepository {
                score
         ORDER BY score DESC
     ";
-
-        let mut result = graph
-            .execute(
-                query(query_text)
-                    .param("embedding", embedding)
-                    .param("topKExtended", top_k_extended)
-                    .param("traceId", trace_id)
-                    .param("partition", partition)
-                    .param("instance", instance)
-                    .param("role", "user"),
-            )
-            .await?;
-
+        let mut result = graph.execute(
+            query(query_text)
+                .param("embedding", embedding)
+                .param("topKExtended", top_k_extended)
+                .param("traceId", trace_id)
+                .param("partition", partition)
+                .param("instance", instance)
+                .param("role", "user"),
+        ).await?;
         let mut content_map: HashMap<String, (MessageNode, f64)> = HashMap::new();
-
         while let Ok(Some(row)) = result.next().await {
-            // Normalize content for deduplication
             let content_str: Option<String> = row.get("content")?;
             let content_key = content_str
                 .as_ref()
                 .map(|c| c.to_lowercase().trim().to_string())
                 .unwrap_or_default();
-
-            // Skip empty content
             if content_key.is_empty() {
                 continue;
             }
-
             let score: f64 = row.get("score")?;
-
             let message = MessageNode {
                 trace_id: row.get("trace_id")?,
                 partition: row.get("partition")?,
@@ -299,8 +284,6 @@ impl MessageRepository for Neo4jMessageRepository {
                 url: row.get("url")?,
                 timestamp: row.get("timestamp")?,
             };
-
-            // Only retain highest scoring message for each unique content
             match content_map.get(&content_key) {
                 Some((_, existing_score)) if *existing_score >= score => {}
                 _ => {
@@ -308,18 +291,14 @@ impl MessageRepository for Neo4jMessageRepository {
                 }
             }
         }
-
-        // Sort the messages by score descending & take top_k
         let mut deduped_messages: Vec<_> =
             content_map.into_iter().map(|(_, (m, s))| (m, s)).collect();
-
         deduped_messages.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let messages: Vec<MessageNode> = deduped_messages
             .into_iter()
             .take(top_k)
             .map(|(m, _score)| m)
             .collect();
-
         Ok(messages)
     }
 
@@ -336,12 +315,10 @@ impl MessageRepository for Neo4jMessageRepository {
         );
         let mut result = graph.execute(query(q.as_str())).await?;
         let mut messages = Vec::new();
-
         while let Some(row) = result.next().await? {
             let node: MessageNode = row.get("m")?;
             messages.push(node);
         }
-
         Ok(messages)
     }
 
@@ -403,7 +380,6 @@ impl MessageRepository for Neo4jMessageRepository {
             let node: MessageNode = row.get("m")?;
             println!("Connected nodes: {:?}", node);
         }
-
         let q = r#"
             MATCH (m1:MessageNode)-[r:SYNAPSE]->(m2:MessageNode)
             WHERE r.score < 0.85
@@ -414,7 +390,6 @@ impl MessageRepository for Neo4jMessageRepository {
             let node: MessageNode = row.get("m")?;
             println!("Deleted synapse: {:?}", node);
         }
-
         Ok(())
     }
 
@@ -430,10 +405,7 @@ impl MessageRepository for Neo4jMessageRepository {
             MATCH p=(m:MessageNode {trace_id: $trace_id})-[:SYNAPSE*1..10]-(n:MessageNode)
             RETURN nodes(p) AS allNodes
         "#;
-        let mut result = graph
-            .execute(query(q).param("trace_id", node.trace_id.clone()))
-            .await?;
-    
+        let mut result = graph.execute(query(q).param("trace_id", node.trace_id.clone())).await?;
         let mut connected_nodes = Vec::new();
         while let Ok(Some(row)) = result.next().await {
             let nodes: Vec<MessageNode> = row.get("allNodes")?;
