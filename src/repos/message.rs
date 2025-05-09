@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use crate::models::message_node::MessageNode;
 use anyhow::Error;
 use neo4rs::*;
-use crate::repos::config::{get_neo4j_uri, get_neo4j_user, get_neo4j_password, get_neo4j_database};
-use tracing::{info, warn, error};
+use crate::repos::config::{get_neo4j_uri, get_neo4j_user, get_neo4j_password};
+use tracing::{info, error};
 
 pub trait MessageRepository {
     async fn save_message_node(&self, message_node: &MessageNode) -> Result<(), Error>;
@@ -50,7 +50,6 @@ pub struct Neo4jMessageRepository {
     uri: String,
     user: String,
     pass: String,
-    database: String,
 }
 
 impl Neo4jMessageRepository {
@@ -59,7 +58,6 @@ impl Neo4jMessageRepository {
             uri: get_neo4j_uri(),
             user: get_neo4j_user(),
             pass: get_neo4j_password(),
-            database: get_neo4j_database(),
         }
     }
 

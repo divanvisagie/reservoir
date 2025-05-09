@@ -101,8 +101,3 @@ pub fn get_reservoir_port() -> u16 {
         .unwrap_or(3017)
 }
 
-pub fn get_neo4j_database() -> String {
-    get_config().neo4j_database.clone()
-        .or_else(|| env::var("NEO4J_DATABASE").ok())
-        .unwrap_or_else(|| "reservoir".to_string())
-} 

@@ -31,6 +31,8 @@ pub enum SubCommands {
     Import(ImportSubCommand),
     /// View last x messages in the default partition/instance
     View(ViewSubCommand),
+    /// Search messages by keyword or semantic similarity
+    Search(crate::commands::search::SearchSubCommand),
 }
 
 #[derive(Parser, Debug)]

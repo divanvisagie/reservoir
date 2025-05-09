@@ -3,7 +3,7 @@ use std::env;
 use anyhow::Error;
 use http::header;
 use utils::compress_system_context;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error};
 
 pub mod utils;
 
@@ -22,7 +22,6 @@ fn ollama_base_url() -> String {
     env::var(RSV_OLLAMA_BASE_URL)
         .unwrap_or_else(|_| "http://localhost:11434/v1/chat/completions".to_string())
 }
-
 fn mistral_base_url() -> String {
     env::var(RSV_MISTRAL_BASE_URL)
         .unwrap_or_else(|_| "https://api.mistral.ai/v1/chat/completions".to_string())

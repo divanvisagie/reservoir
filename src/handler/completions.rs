@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use crate::models::chat_request::ChatRequest;
 use crate::{models::message_node::MessageNode, repos::message::Neo4jMessageRepository};
-use tracing::{info, warn, error};
+use tracing::{info, error};
 
 const SIMILAR_MESSAGES_LIMIT: usize = 7;
 const LAST_MESSAGES_LIMIT: usize = 15;
@@ -161,7 +161,6 @@ async fn save_chat_request(
 pub async fn is_last_message_too_big(
     last_message: &Message,
     model: &LanguageModel,
-    trace_id: &str,
 ) -> Option<Bytes> {
     let model = match model {
         LanguageModel::Ollama(model_info) => model_info,
@@ -234,7 +233,7 @@ pub async fn handle_with_partition(
         .last()
         .ok_or_else(|| anyhow::anyhow!("There are no messages in the request"))?;
 
-    let too_big = is_last_message_too_big(last_message, &model, &trace_id).await;
+    let too_big = is_last_message_too_big(last_message, &model).await;
     if let Some(bytes) = too_big {
         return Ok(bytes);
     }

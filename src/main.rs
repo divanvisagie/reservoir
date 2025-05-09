@@ -1,32 +1,23 @@
 use anyhow::Error;
+use commands::view::execute;
 use handler::completions::handle_with_partition;
 use http_body_util::BodyExt;
 use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::body::Incoming;
-use hyper::server::conn::http1;
-use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
-use hyper_util::rt::TokioIo;
-use repos::message::{Neo4jMessageRepository, MessageRepository};
-use repos::config::get_reservoir_port;
+use repos::message::Neo4jMessageRepository;
 use std::convert::Infallible;
-use std::env;
-use std::net::SocketAddr;
-use tokio::net::TcpListener;
-
 use args::{Args, SubCommands};
 use clap::Parser;
-use serde_json;
-use std::fs;
-use tracing::{info, warn, error};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use tracing::{info, error};
 
 mod clients;
 mod handler;
 mod models;
 mod repos;
 mod args;
+mod commands;
 
 fn get_partition_from_path(path: &str) -> String {
     path.strip_prefix("/v1/partition/")
@@ -48,16 +39,15 @@ fn is_chat_request(path: &str) -> bool {
     path.contains("/chat/completions") || path.starts_with("/v1/partition/")
 }
 
+fn is_reservoir_command_endpoint(path: &str) ->  bool {
+    path.starts_with("/reservoir/command") || path.starts_with("/v1/partition/")
+}
+
 async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
     info!("Received request: {} {}", req.method(), req.uri().path());
 
     match (req.method(), req.uri().path()) {
-        (&Method::POST, path) if path.starts_with("/v1/") => {
-            if !is_chat_request(path) {
-                let mut not_found = Response::new(Full::new(Bytes::from("Not Found")));
-                *not_found.status_mut() = StatusCode::NOT_FOUND;
-                return Ok(not_found);
-            }
+        (&Method::POST, path) if path.starts_with("/v1/") && is_chat_request(path) => {
             let partition = get_partition_from_path(path);
             info!("Partition: {}", partition);
             let instance = get_instance_from_path(path).unwrap_or(partition.clone());
@@ -87,35 +77,45 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
             )))))
         }
 
+        (&Method::GET, path) if is_reservoir_command_endpoint(path) => {
+            let partition = get_partition_from_path(path);
+            info!("Partition: {}", partition);
+            let instance = get_instance_from_path(path).unwrap_or(partition.clone());
+            info!("Instance: {}", instance);
+
+            // the last part of the path should be the number, lets get it
+            let count = path
+                .split('/')
+                .last()
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(5);
+            // convert to usize
+            let count = count as usize;
+
+            let repo = Neo4jMessageRepository::default();
+
+            let result = execute(&repo, partition, instance, count).await;
+
+            match result {
+                Ok(output) => {
+                    let json = serde_json::to_string(&output).unwrap();
+                    let response = Response::new(Full::new(Bytes::from(json)));
+                    Ok(response)
+                }
+                Err(e) => {
+                    error!("Error executing command: {}", e);
+                    let response = Response::new(Full::new(Bytes::from(format!("Error: {}", e))));
+                    Ok(response)
+                }
+            }
+        }
+
         _ => {
             let mut not_found = Response::new(Full::new(Bytes::from("Not Found")));
             *not_found.status_mut() = StatusCode::NOT_FOUND;
             Ok(not_found)
         }
     }
-}
-
-async fn start_server() -> Result<(), Error> {
-    let port = get_reservoir_port();
-
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    let listener = TcpListener::bind(addr).await?;
-    info!("Listening on http://{}", addr);
-
-    loop {
-        let (stream, _) = listener.accept().await?;
-        let io = TokioIo::new(stream);
-
-        tokio::task::spawn(async move {
-            if let Err(err) = http1::Builder::new()
-                .serve_connection(io, service_fn(handle))
-                .await
-            {
-                error!("Error serving connection: {:?}", err);
-            }
-        });
-    }
-
 }
 
 #[tokio::main]
@@ -131,60 +131,24 @@ async fn main() -> Result<(), Error> {
     let repo = Neo4jMessageRepository::default();
     match args.subcmd {
         Some(SubCommands::Start(_)) => {
-            repo.init_vector_index().await?;
-            start_server().await?;
+            commands::start::run(&repo).await?;
         }
         Some(SubCommands::Config(_config_subcmd)) => {
-            info!("Not yet supported");
+            commands::config::run().await?;
         }
         Some(SubCommands::Export) => {
-            // Export all message nodes as JSON
-            let messages = repo.get_messages_for_partition(None).await?;
-            let json = serde_json::to_string_pretty(&messages)?;
-            println!("{}", json);
+            commands::export::run(&repo).await?;
         }
         Some(SubCommands::Import(import_cmd)) => {
-            // Import message nodes from a JSON file
-            let file_content = fs::read_to_string(&import_cmd.file)?;
-            let messages: Vec<models::message_node::MessageNode> = serde_json::from_str(&file_content)?;
-            for message in &messages {
-                repo.save_message_node(message).await?;
-            }
-            println!("Imported {} message nodes from {}", messages.len(), import_cmd.file);
+            commands::import::run(&repo, &import_cmd.file).await?;
         }
-        Some(SubCommands::View(view_cmd)) => {
-            // View the last `count` messages in the specified partition/instance
-            let partition = view_cmd
-                .partition
-                .clone()
-                .unwrap_or_else(|| "default".to_string());
-            let instance = view_cmd
-                .instance
-                .clone()
-                .unwrap_or_else(|| partition.clone());
-            let mut messages = repo
-                .get_last_messages_for_partition_and_instance(
-                    partition.clone(),
-                    instance.clone(),
-                    view_cmd.count,
-                )
-                .await?;
-            // Reverse to show oldest first
-            messages.reverse();
-            for msg in messages {
-                // Convert timestamp (ms) to RFC3339
-                let dt = NaiveDateTime::from_timestamp_opt(
-                    msg.timestamp / 1000,
-                    ((msg.timestamp % 1000) * 1_000_000) as u32,
-                )
-                .unwrap();
-                let dt: DateTime<Utc> = DateTime::from_utc(dt, Utc);
-                let content = msg.content.unwrap_or_default();
-                println!("{} [{}] {}: {}", dt.to_rfc3339(), msg.trace_id, msg.role, content);
-            }
+        Some(SubCommands::View(ref view_cmd)) => {
+            commands::view::run(&repo, view_cmd).await?;
         }
-        None => {
+        Some(SubCommands::Search(ref search_cmd)) => {
+            commands::search::run(&repo, search_cmd).await?;
         }
+        None => {}
     };
     Ok(())
 }
