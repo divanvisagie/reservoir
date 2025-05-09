@@ -3,6 +3,7 @@ use std::env;
 use anyhow::Error;
 use http::header;
 use utils::compress_system_context;
+use tracing::{debug, error, info, warn};
 
 pub mod utils;
 
@@ -122,7 +123,7 @@ pub async fn get_completion_message(
     let body = match serde_json::to_string(&chat_request) {
         Ok(b) => b,
         Err(e) => {
-            eprintln!("Failed to serialize chat request model: {}", e);
+            error!("Failed to serialize chat request model: {}", e);
             return Err(Error::msg(format!(
                 "Failed to serialize chat request: {}",
                 e
@@ -130,7 +131,7 @@ pub async fn get_completion_message(
         }
     };
 
-    println!(
+    debug!(
         "Sending request to LLM API: {} -  {}\nbody:\n{}",
         body,
         model_info.name.clone(),
@@ -149,7 +150,7 @@ pub async fn get_completion_message(
     let response = match response {
         Ok(resp) => resp,
         Err(e) => {
-            eprintln!("Error sending request to LLM API: {}", e);
+            error!("Error sending request to LLM API: {}", e);
             return Err(Error::msg(format!(
                 "Failed to send request to LLM API: {}",
                 e
@@ -161,13 +162,13 @@ pub async fn get_completion_message(
     let response_text = match response.text().await {
         Ok(text) => text,
         Err(e) => {
-            eprintln!("Error reading response text: {}", e);
+            error!("Error reading response text: {}", e);
             return Err(Error::msg(format!("Failed to read response text: {}", e)));
         }
     };
 
     if !status.is_success() {
-        eprintln!(
+        error!(
             "LLM API returned error status {}: {}",
             status, response_text
         );
@@ -180,7 +181,7 @@ pub async fn get_completion_message(
     match ChatResponse::from_json(&response_text) {
         Ok(r) => Ok(r),
         Err(e) => {
-            eprintln!(
+            error!(
                 "Error parsing response JSON: {}\nRaw response: {}",
                 e, response_text
             );

@@ -2,6 +2,7 @@ use anyhow::Error;
 use reqwest::header;
 use serde::{Deserialize, Serialize};
 use std::env;
+use tracing::{error};
 
 const OPENAI_API_URL: &str = "https://api.openai.com/v1/embeddings"; // Assuming you meant the embeddings endpoint
 
@@ -64,15 +65,15 @@ pub async fn get_embeddings_for_text(text: &str) -> Result<Vec<Embedding>, Error
                     res.json().await?;
                 Ok(embeddings.data)
             } else {
-                eprintln!("Error: Received non-success status code {}", res.status());
+                error!("Error: Received non-success status code {}", res.status());
                 let error_response: serde_json::Value =
                     res.json().await.expect("Failed to parse error response");         
-                eprintln!("Error response: {:?}", error_response);
+                error!("Error response: {:?}", error_response);
                 panic!("Failed to get embeddings");
             }
         }
         Err(e) => {
-            eprintln!("Error sending request: {}", e);
+            error!("Error sending request: {}", e);
             panic!("Failed to send request to OpenAI API");
         }
     }

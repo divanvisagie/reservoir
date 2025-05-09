@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 use crate::models::chat_request::ChatRequest;
 use crate::{models::message_node::MessageNode, repos::message::Neo4jMessageRepository};
+use tracing::{info, warn, error};
 
 const SIMILAR_MESSAGES_LIMIT: usize = 7;
 const LAST_MESSAGES_LIMIT: usize = 15;
@@ -56,13 +57,13 @@ fn count_single_message_tokens(message: &Message) -> usize {
 
 fn truncate_messages_if_needed(messages: &mut Vec<Message>, limit: usize) {
     let mut current_tokens = count_chat_tokens(messages);
-    println!("Current token count: {}", current_tokens);
+    info!("Current token count: {}", current_tokens);
 
     if current_tokens <= limit {
         return; // No truncation needed
     }
 
-    println!(
+    info!(
         "Token count ({}) exceeds limit ({}), truncating...",
         current_tokens, limit
     );
@@ -90,7 +91,7 @@ fn truncate_messages_if_needed(messages: &mut Vec<Message>, limit: usize) {
         // If it's safe to remove (not system, not the last message)
         if messages.len() > 1 {
             // Ensure we don't remove the only message left (shouldn't happen here)
-            println!(
+            info!(
                 "Removing message at index {}: Role='{}', Content='{}...'",
                 current_index,
                 messages[current_index].role,
@@ -110,15 +111,15 @@ fn truncate_messages_if_needed(messages: &mut Vec<Message>, limit: usize) {
             // but let's stick to the simpler approach for now. If performance becomes an issue, optimize this.
         } else {
             // Safety break: Should not be able to remove the last message due to the check above.
-            eprintln!("Warning: Truncation stopped unexpectedly.");
+            error!("Warning: Truncation stopped unexpectedly.");
             break;
         }
     }
 
-    println!("Truncated token count: {}", current_tokens);
+    info!("Truncated token count: {}", current_tokens);
 
     if current_tokens > limit {
-        eprintln!(
+        error!(
             "Warning: Could not truncate messages enough while preserving system/last messages. Limit: {}, Current: {}",
             limit, current_tokens
         );
@@ -171,7 +172,7 @@ pub async fn is_last_message_too_big(
     let input_token_limit = model.input_tokens;
     let last_message_tokens = count_single_message_tokens(last_message);
     if last_message_tokens > input_token_limit {
-        println!(
+        info!(
             "Last message token count ({}) exceeds limit ({}), returning error response.",
             last_message_tokens, input_token_limit
         );
@@ -203,7 +204,7 @@ pub async fn is_last_message_too_big(
         let response_bytes = serde_json::to_vec(&error_response).unwrap();
         return Some(Bytes::from(response_bytes));
     } else {
-        println!(
+        info!(
             "Last message token count ({}) is within limit ({}).",
             last_message_tokens, input_token_limit
         );
@@ -241,7 +242,7 @@ pub async fn handle_with_partition(
     let search_term = last_message.content.as_str();
     get_last_message_in_chat_request(&chat_request_model)?;
 
-    println!("Using search term: {}", search_term);
+    info!("Using search term: {}", search_term);
     let embeddings = get_embeddings_for_text(search_term)
         .await?
         .first()
@@ -259,7 +260,7 @@ pub async fn handle_with_partition(
         )
         .await
         .unwrap_or_else(|e| {
-            eprintln!("Error finding similar messages: {}", e);
+            error!("Error finding similar messages: {}", e);
             Vec::new()
         })
     } else {
@@ -292,7 +293,7 @@ pub async fn handle_with_partition(
         )
         .await
         .unwrap_or_else(|e| {
-            eprintln!("Error finding last messages: {}", e);
+            error!("Error finding last messages: {}", e);
             Vec::new() // Return empty vec on error
         });
     save_chat_request(&chat_request_model, trace_id.as_str(), partition, instance)

@@ -19,6 +19,7 @@ use args::{Args, SubCommands};
 use clap::Parser;
 use serde_json;
 use std::fs;
+use tracing::{info, warn, error};
 
 mod clients;
 mod handler;
@@ -47,7 +48,7 @@ fn is_chat_request(path: &str) -> bool {
 }
 
 async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
-    println!("Received request: {} {}", req.method(), req.uri().path());
+    info!("Received request: {} {}", req.method(), req.uri().path());
 
     match (req.method(), req.uri().path()) {
         (&Method::POST, path) if path.starts_with("/v1/") => {
@@ -57,9 +58,9 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
                 return Ok(not_found);
             }
             let partition = get_partition_from_path(path);
-            println!("Partition: {}", partition);
+            info!("Partition: {}", partition);
             let instance = get_instance_from_path(path).unwrap_or(partition.clone());
-            println!("Instance: {}", instance);
+            info!("Instance: {}", instance);
 
             let whole_body = req.into_body().collect().await.unwrap().to_bytes();
             let response_bytes =
@@ -67,7 +68,7 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
             let response_bytes = match response_bytes {
                 Ok(bytes) => bytes,
                 Err(e) => {
-                    eprintln!("Error handling request: {}", e);
+                    error!("Error handling request: {}", e);
                     return Ok(Response::new(Full::new(Bytes::from(
                         "Internal Server Error",
                     ))));
@@ -98,7 +99,7 @@ async fn start_server() -> Result<(), Error> {
 
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let listener = TcpListener::bind(addr).await?;
-    println!("Listening on http://{}", addr);
+    info!("Listening on http://{}", addr);
 
     loop {
         let (stream, _) = listener.accept().await?;
@@ -109,7 +110,7 @@ async fn start_server() -> Result<(), Error> {
                 .serve_connection(io, service_fn(handle))
                 .await
             {
-                println!("Error serving connection: {:?}", err);
+                error!("Error serving connection: {:?}", err);
             }
         });
     }
@@ -118,6 +119,13 @@ async fn start_server() -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .with_env_filter(
+            std::env::var("RUST_LOG")
+                .unwrap_or_else(|_| "reservoir=info".to_string())
+        )
+        .init();
     let args = Args::parse();
     let repo = Neo4jMessageRepository::default();
     match args.subcmd {
@@ -126,7 +134,7 @@ async fn main() -> Result<(), Error> {
             start_server().await?;
         }
         Some(SubCommands::Config(_config_subcmd)) => {
-            println!("Not yet supported");
+            info!("Not yet supported");
         }
         Some(SubCommands::Export) => {
             // Export all message nodes as JSON

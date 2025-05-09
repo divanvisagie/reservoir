@@ -4,6 +4,7 @@ use crate::models::message_node::MessageNode;
 use anyhow::Error;
 use neo4rs::*;
 use crate::repos::config::{get_neo4j_uri, get_neo4j_user, get_neo4j_password, get_neo4j_database};
+use tracing::{info, warn, error};
 
 pub trait MessageRepository {
     async fn save_message_node(&self, message_node: &MessageNode) -> Result<(), Error>;
@@ -94,14 +95,14 @@ impl Neo4jMessageRepository {
                 while let Ok(Some(row)) = rows.next().await {
                     let name: String = row.get("name")?;
                     if name == index_name {
-                        println!("Index {} created successfully", index_name);
+                        info!("Index {} created successfully", index_name);
                     }
                 }
             }
             Err(e) => {
                 // Check if it's the "equivalent index already exists" error and suppress it
                 if format!("{:?}", e).contains("EquivalentSchemaRuleAlreadyExistsException") {
-                    println!("Index '{}' already exists, skipping creation", index_name);
+                    info!("Index '{}' already exists, skipping creation", index_name);
                 } else {
                     Err(e)?;
                 }
@@ -378,7 +379,7 @@ impl MessageRepository for Neo4jMessageRepository {
         let mut result = graph.execute(query(q)).await?;
         while let Ok(Some(row)) = result.next().await {
             let node: MessageNode = row.get("m")?;
-            println!("Connected nodes: {:?}", node);
+            info!("Connected nodes: {:?}", node);
         }
         let q = r#"
             MATCH (m1:MessageNode)-[r:SYNAPSE]->(m2:MessageNode)
@@ -388,7 +389,7 @@ impl MessageRepository for Neo4jMessageRepository {
         let mut result = graph.execute(query(q)).await?;
         while let Ok(Some(row)) = result.next().await {
             let node: MessageNode = row.get("m")?;
-            println!("Deleted synapse: {:?}", node);
+            error!("Deleted synapse: {:?}", node);
         }
         Ok(())
     }
@@ -436,7 +437,7 @@ mod tests {
         };
         let result = repo.save_message_node(&message_node).await;
         if result.is_err() {
-            println!("Error saving message node: {:?}", result);
+            error!("Error saving message node: {:?}", result);
         }
         assert!(result.is_ok());
     }
@@ -458,7 +459,7 @@ mod tests {
         let result = repo.get_messages_for_partition(partition).await;
         // should be
         if result.is_err() {
-            println!("Error getting messages for partition: {:?}", result);
+            error!("Error getting messages for partition: {:?}", result);
         }
 
         // we should find a result with the test-first traceId
@@ -503,7 +504,7 @@ mod tests {
 
         let result = repo.delete_message_node(trace_id).await;
         if result.is_err() {
-            println!("Error deleting message node: {:?}", result);
+            error!("Error deleting message node: {:?}", result);
         }
         assert!(result.is_ok());
         let result = repo.get_message_node(trace_id).await;
