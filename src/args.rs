@@ -29,6 +29,8 @@ pub enum SubCommands {
     Export,
     /// Import message nodes from a JSON file
     Import(ImportSubCommand),
+    /// View last x messages in the default partition/instance
+    View(ViewSubCommand),
 }
 
 #[derive(Parser, Debug)]
@@ -55,4 +57,17 @@ pub struct ConfigSubCommand {
 pub struct ImportSubCommand {
     /// Path to the JSON file to import
     pub file: String,
+}
+// ----------------------------------------
+#[derive(Parser, Debug)]
+#[command(author, version, about = "View last x messages", long_about = None)]
+pub struct ViewSubCommand {
+    /// Number of messages to display
+    pub count: usize,
+    /// Partition to view (defaults to "default")
+    #[arg(short, long)]
+    pub partition: Option<String>,
+    /// Instance to view (defaults to partition)
+    #[arg(short, long)]
+    pub instance: Option<String>,
 }

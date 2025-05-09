@@ -108,6 +108,20 @@ Reservoir's documentation is organized into the following sections:
 
 Reservoir provides an OpenAI-compatible API endpoint. You can use your system username as the partition and your application name as the instance for best results.
 
+### Starting the Server
+
+To start the Reservoir server:
+
+```bash
+cargo run -- start
+```
+
+This command:
+1. Initializes the vector index in Neo4j for semantic search
+2. Starts the server on the configured port (default: 3017)
+
+The server will be available at `http://localhost:3017` (or your configured port).
+
 ### Import/Export Data
 
 Reservoir supports exporting all message nodes to a JSON file and importing them back into the database. This is useful for backup, migration, or sharing your AI conversation history.
@@ -123,6 +137,28 @@ This command prints all message nodes in the database as pretty-printed JSON to 
 
 ```bash
 cargo run -- import path/to/messages.json
+```
+
+### View the last N messages
+
+```bash
+cargo run -- view <COUNT> [--partition <PARTITION>] [--instance <INSTANCE>]
+```
+
+Displays the last `<COUNT>` messages in the specified partition and instance. If not provided, `partition` defaults to "default" and `instance` defaults to the partition.
+
+Example:
+```bash
+cargo run -- view 5 --partition sales --instance eu-west
+```
+
+Sample output:
+```
+2025-05-09T14:23:01+00:00 [abc123] user: Hello there!
+2025-05-09T14:23:02+00:00 [abc123] assistant: Hi! How can I help?
+2025-05-09T14:24:10+00:00 [def456] user: Show me last week's sales report.
+2025-05-09T14:24:12+00:00 [def456] assistant: Here is the summary for last week's sales...
+2025-05-09T14:25:00+00:00 [ghi789] user: Thanks!
 ```
 This command reads the specified JSON file (in the same format as the export) and imports all message nodes into the database.
 

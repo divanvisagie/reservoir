@@ -20,6 +20,7 @@ use clap::Parser;
 use serde_json;
 use std::fs;
 use tracing::{info, warn, error};
+use chrono::{DateTime, NaiveDateTime, Utc};
 
 mod clients;
 mod handler;
@@ -150,6 +151,37 @@ async fn main() -> Result<(), Error> {
                 repo.save_message_node(message).await?;
             }
             println!("Imported {} message nodes from {}", messages.len(), import_cmd.file);
+        }
+        Some(SubCommands::View(view_cmd)) => {
+            // View the last `count` messages in the specified partition/instance
+            let partition = view_cmd
+                .partition
+                .clone()
+                .unwrap_or_else(|| "default".to_string());
+            let instance = view_cmd
+                .instance
+                .clone()
+                .unwrap_or_else(|| partition.clone());
+            let mut messages = repo
+                .get_last_messages_for_partition_and_instance(
+                    partition.clone(),
+                    instance.clone(),
+                    view_cmd.count,
+                )
+                .await?;
+            // Reverse to show oldest first
+            messages.reverse();
+            for msg in messages {
+                // Convert timestamp (ms) to RFC3339
+                let dt = NaiveDateTime::from_timestamp_opt(
+                    msg.timestamp / 1000,
+                    ((msg.timestamp % 1000) * 1_000_000) as u32,
+                )
+                .unwrap();
+                let dt: DateTime<Utc> = DateTime::from_utc(dt, Utc);
+                let content = msg.content.unwrap_or_default();
+                println!("{} [{}] {}: {}", dt.to_rfc3339(), msg.trace_id, msg.role, content);
+            }
         }
         None => {
         }
