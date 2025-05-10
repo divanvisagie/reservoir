@@ -80,40 +80,8 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
             )))))
         }
 
-        (&Method::GET, path) if is_reservoir_command_endpoint(path) => {
-            let partition = get_partition_from_path(path);
-            info!("Partition: {}", partition);
-            let instance = get_instance_from_path(path).unwrap_or(partition.clone());
-            info!("Instance: {}", instance);
-
-            // the last part of the path should be the number, lets get it
-            let count = path
-                .split('/')
-                .last()
-                .and_then(|s| s.parse::<u32>().ok())
-                .unwrap_or(5);
-            // convert to usize
-            let count = count as usize;
-
-            let repo = Neo4jMessageRepository::default();
-
-            let result = execute(&repo, partition, instance, count).await;
-
-            match result {
-                Ok(output) => {
-                    let json = serde_json::to_string(&output).unwrap();
-                    let response = Response::new(Full::new(Bytes::from(json)));
-                    Ok(response)
-                }
-                Err(e) => {
-                    error!("Error executing command: {}", e);
-                    let response = Response::new(Full::new(Bytes::from(format!("Error: {}", e))));
-                    Ok(response)
-                }
-            }
-        }
-
-        (&Method::GET, path) if path.contains("/search/") => {
+        (&Method::GET, path) if path.contains("/search") => {
+            info!("Search request: {}", path);
             let partition = get_partition_from_path(path);
             info!("Partition: {}", partition);
             let instance = get_instance_from_path(path).unwrap_or(partition.clone());
@@ -153,6 +121,39 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
                 }
                 Err(e) => {
                     error!("Error executing search: {}", e);
+                    let response = Response::new(Full::new(Bytes::from(format!("Error: {}", e))));
+                    Ok(response)
+                }
+            }
+        }
+
+        (&Method::GET, path) if is_reservoir_command_endpoint(path) => {
+            let partition = get_partition_from_path(path);
+            info!("Partition: {}", partition);
+            let instance = get_instance_from_path(path).unwrap_or(partition.clone());
+            info!("Instance: {}", instance);
+
+            // the last part of the path should be the number, lets get it
+            let count = path
+                .split('/')
+                .last()
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(5);
+            // convert to usize
+            let count = count as usize;
+
+            let repo = Neo4jMessageRepository::default();
+
+            let result = execute(&repo, partition, instance, count).await;
+
+            match result {
+                Ok(output) => {
+                    let json = serde_json::to_string(&output).unwrap();
+                    let response = Response::new(Full::new(Bytes::from(json)));
+                    Ok(response)
+                }
+                Err(e) => {
+                    error!("Error executing command: {}", e);
                     let response = Response::new(Full::new(Bytes::from(format!("Error: {}", e))));
                     Ok(response)
                 }
