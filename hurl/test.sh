@@ -10,3 +10,7 @@ echo ""
 echo ""
 echo_blue_bold " hurl/reservoir-view.hurl >"
 hurl --variable USER="$USER" --variable OPENAI_API_KEY="$OPENAI_API_KEY" hurl/reservoir-view.hurl
+echo ""
+echo ""
+echo_blue_bold " hurl/reservoir-search.hurl >"
+hurl --variable USER="$USER" --variable OPENAI_API_KEY="$OPENAI_API_KEY" hurl/reservoir-search.hurl

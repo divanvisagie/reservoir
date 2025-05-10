@@ -11,6 +11,7 @@ use std::convert::Infallible;
 use args::{Args, SubCommands};
 use clap::Parser;
 use tracing::{info, error};
+use commands::search::execute as search_execute;
 
 mod clients;
 mod handler;
@@ -106,6 +107,52 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
                 }
                 Err(e) => {
                     error!("Error executing command: {}", e);
+                    let response = Response::new(Full::new(Bytes::from(format!("Error: {}", e))));
+                    Ok(response)
+                }
+            }
+        }
+
+        (&Method::GET, path) if path.contains("/search/") => {
+            let partition = get_partition_from_path(path);
+            info!("Partition: {}", partition);
+            let instance = get_instance_from_path(path).unwrap_or(partition.clone());
+            info!("Instance: {}", instance);
+
+            // Extract count from the path (last segment)
+            let count = path
+                .split('/')
+                .last()
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(5) as usize;
+
+            // Parse query parameters for term and semantic
+            let query = req.uri().query().unwrap_or("");
+            let mut term = "".to_string();
+            let mut semantic = false;
+            for (key, value) in url::form_urlencoded::parse(query.as_bytes()) {
+                if key == "term" {
+                    term = value.into_owned();
+                } else if key == "semantic" {
+                    semantic = value == "true" || value == "1";
+                }
+            }
+
+            if term.is_empty() {
+                let response = Response::new(Full::new(Bytes::from("Missing 'term' query parameter")));
+                return Ok(response);
+            }
+
+            let repo = Neo4jMessageRepository::default();
+            let result = search_execute(&repo, partition, instance, count, term, semantic).await;
+            match result {
+                Ok(output) => {
+                    let json = serde_json::to_string(&output).unwrap();
+                    let response = Response::new(Full::new(Bytes::from(json)));
+                    Ok(response)
+                }
+                Err(e) => {
+                    error!("Error executing search: {}", e);
                     let response = Response::new(Full::new(Bytes::from(format!("Error: {}", e))));
                     Ok(response)
                 }

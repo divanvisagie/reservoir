@@ -3,6 +3,7 @@ use crate::repos::message::{MessageRepository, Neo4jMessageRepository};
 use anyhow::Error;
 use crate::clients::openai::embeddings::get_embeddings_for_text;
 use crate::models::message_node::MessageNode;
+use crate::clients::openai::types::Message;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Search messages by keyword or semantic similarity", long_about = None)]
@@ -50,4 +51,37 @@ pub async fn run(repo: &Neo4jMessageRepository, cmd: &SearchSubCommand) -> Resul
         }
     }
     Ok(())
+}
+
+pub async fn execute(
+    repo: &Neo4jMessageRepository,
+    partition: String,
+    instance: String,
+    count: usize,
+    term: String,
+    semantic: bool,
+) -> Result<Vec<Message>, Error> {
+    if semantic {
+        // Semantic search: get embedding for the term, then use find_similar_messages
+        let embeddings = get_embeddings_for_text(&term).await?;
+        let embedding = embeddings.first().map(|e| e.embedding.clone()).unwrap_or_default();
+        let results = repo.find_similar_messages(
+            embedding,
+            "search-trace-id",
+            &partition,
+            &instance,
+            count,
+        ).await?;
+        let messages: Vec<Message> = results.iter().map(|m| m.to_message()).collect();
+        Ok(messages)
+    } else {
+        // Keyword search: fetch all messages and filter by keyword
+        let messages = repo.get_messages_for_partition(Some(&partition)).await?;
+        let filtered: Vec<Message> = messages.iter()
+            .filter(|m| m.content.as_deref().unwrap_or("").to_lowercase().contains(&term.to_lowercase()))
+            .take(count)
+            .map(|m| m.to_message())
+            .collect();
+        Ok(filtered)
+    }
 } 
