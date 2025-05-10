@@ -1,16 +1,19 @@
 use anyhow::Error;
 use http::header;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use crate::utils::compress_system_context;
 
-use super::{model_info::ModelInfo, types::{ChatRequest, ChatResponse}};
-
+use super::{
+    model_info::ModelInfo,
+    types::{ChatRequest, ChatResponse},
+};
 
 pub async fn get_completion_message(
     model_info: &ModelInfo,
     chat_request: &ChatRequest,
 ) -> Result<ChatResponse, Error> {
+    info!("Getting completion with model {}", model_info.name);
     let client = reqwest::Client::new();
 
     let context = compress_system_context(&chat_request.messages);
