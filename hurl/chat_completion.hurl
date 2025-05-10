@@ -1,4 +1,4 @@
-POST http://127.0.0.1:3017/v1/partition/{{USER}}/instance/reservoir/chat/completions
+POST http://127.0.0.1:3017/partition/{{USER}}/instance/reservoir/v1/chat/completions
 Content-Type: application/json
 
 {

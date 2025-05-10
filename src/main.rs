@@ -23,14 +23,14 @@ mod services;
 mod utils;
 
 fn get_partition_from_path(path: &str) -> String {
-    path.strip_prefix("/v1/partition/")
+    path.strip_prefix("/partition/")
         .and_then(|rest| rest.split('/').next())
         .map(|s| s.to_string())
         .unwrap_or_else(|| "default".to_string())
 }
 
 fn get_instance_from_path(path: &str) -> Option<String> {
-    let parts: Vec<&str> = path.strip_prefix("/v1/partition/")?.split('/').collect();
+    let parts: Vec<&str> = path.strip_prefix("/partition/")?.split('/').collect();
     if parts.len() >= 3 && parts[1] == "instance" {
         Some(parts[2].to_string())
     } else {
@@ -54,7 +54,8 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
     info!("Received request: {} {}", req.method(), req.uri().path());
 
     match (req.method(), req.uri().path()) {
-        (&Method::POST, path) if path.starts_with("/v1/") && is_chat_request(path) => {
+        (&Method::POST, path) if is_chat_request(path) => {
+            info!("Chat request: {}", path);
             let partition = get_partition_from_path(path);
             info!("Partition: {}", partition);
             let instance = get_instance_from_path(path).unwrap_or(partition.clone());
