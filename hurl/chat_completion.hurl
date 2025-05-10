@@ -2,7 +2,7 @@ POST http://127.0.0.1:3017/v1/partition/{{USER}}/instance/reservoir/chat/complet
 Content-Type: application/json
 
 {
-  "model": "gpt-4o",
+  "model": "gpt-4.1",
   "messages": [
     {
       "role": "user",
@@ -10,3 +10,5 @@ Content-Type: application/json
     }
   ]
 }
+
+HTTP/1.1 200
