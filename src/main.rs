@@ -1,4 +1,7 @@
 use anyhow::Error;
+use args::{Args, SubCommands};
+use clap::Parser;
+use commands::search::execute as search_execute;
 use commands::view::execute;
 use handler::completions::handle_with_partition;
 use http_body_util::BodyExt;
@@ -8,19 +11,16 @@ use hyper::body::Incoming;
 use hyper::{Method, Request, Response, StatusCode};
 use repos::message::Neo4jMessageRepository;
 use std::convert::Infallible;
-use args::{Args, SubCommands};
-use clap::Parser;
-use tracing::{info, error};
-use commands::search::execute as search_execute;
+use tracing::{error, info};
 
+mod args;
 mod clients;
+mod commands;
 mod handler;
 mod models;
 mod repos;
-mod args;
-mod commands;
-mod utils;
 mod services;
+mod utils;
 
 fn get_partition_from_path(path: &str) -> String {
     path.strip_prefix("/v1/partition/")
@@ -39,11 +39,15 @@ fn get_instance_from_path(path: &str) -> Option<String> {
 }
 
 fn is_chat_request(path: &str) -> bool {
-    path.contains("/chat/completions") || path.starts_with("/v1/partition/")
+    path.contains("/chat/completions")
 }
 
-fn is_reservoir_command_endpoint(path: &str) ->  bool {
-    path.starts_with("/reservoir/command") || path.starts_with("/v1/partition/")
+fn is_search_request(path: &str) -> bool {
+    path.contains("/command/search")
+}
+
+fn is_view_request(path: &str) -> bool {
+    path.contains("/command/view")
 }
 
 async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
@@ -80,7 +84,7 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
             )))))
         }
 
-        (&Method::GET, path) if path.contains("/search") => {
+        (&Method::GET, path) if is_search_request(path) => {
             info!("Search request: {}", path);
             let partition = get_partition_from_path(path);
             info!("Partition: {}", partition);
@@ -107,7 +111,8 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
             }
 
             if term.is_empty() {
-                let response = Response::new(Full::new(Bytes::from("Missing 'term' query parameter")));
+                let response =
+                    Response::new(Full::new(Bytes::from("Missing 'term' query parameter")));
                 return Ok(response);
             }
 
@@ -127,7 +132,7 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
             }
         }
 
-        (&Method::GET, path) if is_reservoir_command_endpoint(path) => {
+        (&Method::GET, path) if is_view_request(path) => {
             let partition = get_partition_from_path(path);
             info!("Partition: {}", partition);
             let instance = get_instance_from_path(path).unwrap_or(partition.clone());
@@ -172,10 +177,7 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
 async fn main() -> Result<(), Error> {
     tracing_subscriber::fmt()
         .with_target(false)
-        .with_env_filter(
-            std::env::var("RUST_LOG")
-                .unwrap_or_else(|_| "reservoir=info".to_string())
-        )
+        .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "reservoir=info".to_string()))
         .init();
     let args = Args::parse();
     let repo = Neo4jMessageRepository::default();
