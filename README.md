@@ -163,16 +163,18 @@ Sample output:
 This command reads the specified JSON file (in the same format as the export) and imports all message nodes into the database.
 
 ### Example Usage
-- **Instead of**:
-  https://api.openai.com/v1/chat/completions
-- **Use**:
-  http://localhost:3017/v1/partition/$USER/instance/my-application/chat/completions
 
-Here, `$USER` is the system username, and `my-application` is the instance. Context enrichment and history retrieval are scoped to the specific `partition`/`instance` combination.
+- **Instead of:**  
+  `https://api.openai.com/v1/chat/completions`
+- **Use:**  
+  `http://127.0.0.1:3017/partition/$USER/instance/reservoir/v1/chat/completions`
+
+> Here, `$USER` is your system username, and `reservoir` is the instance name.
 
 #### Curl Example
+
 ```bash
-curl http://localhost:3017/v1/partition/$USER/instance/my-application/chat/completions \
+curl "http://127.0.0.1:3017/partition/$USER/instance/reservoir/v1/chat/completions" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $OPENAI_API_KEY" \
     -d '{
