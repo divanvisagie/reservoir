@@ -1,8 +1,8 @@
 use crate::args::ViewSubCommand;
-use crate::models::Message;
+use crate::clients::openai::types::Message;
 use crate::repos::message::{MessageRepository, Neo4jMessageRepository};
 use anyhow::Error;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use tracing::{info, error};
 
 pub async fn execute(

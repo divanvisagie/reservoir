@@ -2,19 +2,20 @@ use anyhow::Error;
 use std::collections::HashSet;
 use tiktoken_rs::o200k_base;
 
-use crate::clients::llm::{get_completion_message, LanguageModel};
-use crate::models::chat_response::ChatResponse;
+use crate::clients::openai::chat_completions::get_completion_message;
+use crate::clients::openai::model_info::ModelInfo;
+use crate::clients::openai::types::{
+    enrich_chat_request, ChatRequest, ChatResponse, Choice, Message,
+};
+use crate::models::message_node::MessageNode;
+use crate::repos::message::Neo4jMessageRepository;
 use crate::{
-    clients::embeddings::get_embeddings_for_text,
-    models::{chat_request::enrich_chat_request, Choice, Message},
-    repos::message::MessageRepository,
+    clients::openai::embeddings::get_embeddings_for_text, repos::message::MessageRepository,
 };
 use bytes::Bytes;
 use uuid::Uuid;
 
-use crate::models::chat_request::ChatRequest;
-use crate::{models::message_node::MessageNode, repos::message::Neo4jMessageRepository};
-use tracing::{info, error};
+use tracing::{error, info};
 
 const SIMILAR_MESSAGES_LIMIT: usize = 7;
 const LAST_MESSAGES_LIMIT: usize = 15;
@@ -158,16 +159,7 @@ async fn save_chat_request(
     Ok(())
 }
 
-pub async fn is_last_message_too_big(
-    last_message: &Message,
-    model: &LanguageModel,
-) -> Option<Bytes> {
-    let model = match model {
-        LanguageModel::Ollama(model_info) => model_info,
-        LanguageModel::OpenAi(model_info) => model_info,
-        LanguageModel::Mistral(model_info) => model_info,
-        LanguageModel::Gemini(model_info) => model_info,
-    };
+pub async fn is_last_message_too_big(last_message: &Message, model: &ModelInfo) -> Option<Bytes> {
     let input_token_limit = model.input_tokens;
     let last_message_tokens = count_single_message_tokens(last_message);
     if last_message_tokens > input_token_limit {
@@ -217,14 +209,8 @@ pub async fn handle_with_partition(
 ) -> Result<Bytes, Error> {
     let json_string = String::from_utf8_lossy(&whole_body).to_string();
     let mut chat_request_model = ChatRequest::from_json(json_string.as_str()).expect("Valid JSON");
-    let model = LanguageModel::from_str(&chat_request_model.model);
+    let model = ModelInfo::new(chat_request_model.model.clone());
 
-    let (input_token_limit, _output_token_limit) = match &model {
-        LanguageModel::Ollama(info) => (info.input_tokens, info.output_tokens),
-        LanguageModel::OpenAi(info) => (info.input_tokens, info.output_tokens),
-        LanguageModel::Mistral(info) => (info.input_tokens, info.output_tokens),
-        LanguageModel::Gemini(info) => (info.input_tokens, info.output_tokens),
-    };
     let trace_id = Uuid::new_v4().to_string();
     let repo = Neo4jMessageRepository::default();
 
@@ -283,7 +269,6 @@ pub async fn handle_with_partition(
         None => similar,
     };
 
-
     let last_messages = repo
         .get_last_messages_for_partition_and_instance(
             partition.to_string(),
@@ -301,7 +286,7 @@ pub async fn handle_with_partition(
 
     let mut enriched_chat_request =
         enrich_chat_request(similar, last_messages, &mut chat_request_model);
-    truncate_messages_if_needed(&mut enriched_chat_request.messages, input_token_limit);
+    truncate_messages_if_needed(&mut enriched_chat_request.messages, model.input_tokens);
 
     let chat_response = get_completion_message(&model, &enriched_chat_request)
         .await

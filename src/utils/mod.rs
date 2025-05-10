@@ -1,4 +1,4 @@
-use crate::models::Message;
+use crate::clients::openai::types::Message;
 
 fn message_to_string(msg: &Message) -> String {
     match msg.role.as_str() {

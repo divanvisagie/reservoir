@@ -1,6 +1,38 @@
 use serde::{Deserialize, Serialize};
 
-use super::{message_node::MessageNode, Message};
+use crate::models::message_node::MessageNode;
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Message {
+    pub role: String,
+    pub content: String,
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ErrorResponse {
+    pub error: ErrorDetail,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ErrorDetail {
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Usage {
+    pub prompt_tokens: i64,
+    pub completion_tokens: i64,
+    pub total_tokens: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Choice {
+   pub message: Message,
+   pub finish_reason: String,
+   pub index: u64,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatRequest {
@@ -66,11 +98,45 @@ pub fn enrich_chat_request(
     chat_request
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChatResponse {
+    pub id: Option<String>,
+    pub object: Option<String>,
+    pub created: Option<i64>,
+    pub model: Option<String>,
+    pub usage: Option<Usage>,
+    pub choices: Vec<Choice>,
+}
+
+#[allow(dead_code)]
+impl ChatResponse {
+    pub fn new(
+        id: Option<String>,
+        object: Option<String>,
+        created: Option<i64>,
+        model: Option<String>,
+        usage: Option<Usage>,
+        choices: Vec<Choice>,
+    ) -> Self {
+        ChatResponse {
+            id,
+            object,
+            created,
+            model,
+            usage,
+            choices,
+        }
+    }
+
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::chat_request::ChatRequest;
-    use crate::models::{message_node::MessageNode, Message};
+    use crate::models::message_node::MessageNode;
 
     // Helper function to create a dummy MessageNode
     fn create_dummy_node(role: &str, content: &str, timestamp: i64) -> MessageNode {

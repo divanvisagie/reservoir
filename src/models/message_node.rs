@@ -1,5 +1,7 @@
-use crate::models::Message;
 use serde::{Deserialize, Serialize};
+
+use crate::clients::openai::types::Message;
+
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct MessageNode {

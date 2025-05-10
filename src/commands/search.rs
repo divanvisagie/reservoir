@@ -1,7 +1,7 @@
 use clap::Parser;
 use crate::repos::message::{MessageRepository, Neo4jMessageRepository};
 use anyhow::Error;
-use crate::clients::embeddings::get_embeddings_for_text;
+use crate::clients::openai::embeddings::get_embeddings_for_text;
 use crate::models::message_node::MessageNode;
 
 #[derive(Parser, Debug)]
