@@ -212,7 +212,7 @@ pub async fn handle_with_partition(
     let model = ModelInfo::new(chat_request_model.model.clone());
 
     let trace_id = Uuid::new_v4().to_string();
-    let repo = Neo4jMessageRepository::default();
+    let message_repo = Neo4jMessageRepository::default();
 
     let last_message = chat_request_model
         .messages
@@ -236,7 +236,7 @@ pub async fn handle_with_partition(
         .clone();
 
     let mut similar = if !embeddings.is_empty() {
-        repo.find_similar_messages(
+        message_repo.find_similar_messages(
             embeddings,
             trace_id.as_str(),
             partition,
@@ -252,16 +252,16 @@ pub async fn handle_with_partition(
         Vec::new()
     };
 
-    let similar_pairs = repo.find_connections_between_nodes(&similar).await?;
+    let similar_pairs = message_repo.find_connections_between_nodes(&similar).await?;
     similar.extend(similar_pairs);
     let first = similar.first().clone();
     let similar = match first {
         Some(first) => {
-            let r = repo.find_nodes_connected_to_node(first).await?;
-            let r = deduplicate_message_nodes(r);
+            let nodes = message_repo.find_nodes_connected_to_node(first).await?;
+            let nodes = deduplicate_message_nodes(nodes);
 
-            if r.len() > 2 {
-                r
+            if nodes.len() > 2 {
+                nodes
             } else {
                 similar
             }
@@ -269,7 +269,7 @@ pub async fn handle_with_partition(
         None => similar,
     };
 
-    let last_messages = repo
+    let last_messages = message_repo
         .get_last_messages_for_partition_and_instance(
             partition.to_string(),
             instance.to_string(),
@@ -278,7 +278,7 @@ pub async fn handle_with_partition(
         .await
         .unwrap_or_else(|e| {
             error!("Error finding last messages: {}", e);
-            Vec::new() // Return empty vec on error
+            Vec::new() 
         });
     save_chat_request(&chat_request_model, trace_id.as_str(), partition, instance)
         .await
@@ -306,11 +306,11 @@ pub async fn handle_with_partition(
         instance,
         embedding,
     );
-    repo.save_message_node(&message_node)
+    message_repo.save_message_node(&message_node)
         .await
         .expect("Failed to save message node");
 
-    repo.connect_synapses()
+    message_repo.connect_synapses()
         .await
         .expect("Failed to connect synapses");
 
