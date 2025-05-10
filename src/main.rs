@@ -19,6 +19,7 @@ mod repos;
 mod args;
 mod commands;
 mod utils;
+mod services;
 
 fn get_partition_from_path(path: &str) -> String {
     path.strip_prefix("/v1/partition/")

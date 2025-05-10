@@ -2,7 +2,6 @@ use crate::args::ViewSubCommand;
 use crate::clients::openai::types::Message;
 use crate::repos::message::{MessageRepository, Neo4jMessageRepository};
 use anyhow::Error;
-use chrono::NaiveDateTime;
 use tracing::{info, error};
 
 pub async fn execute(
@@ -15,8 +14,8 @@ pub async fn execute(
         .get_last_messages_for_partition_and_instance(partition, instance, count)
         .await?;
     messages.sort_by(|a, b| {
-        let a_time = NaiveDateTime::from_timestamp_millis(a.timestamp).unwrap();
-        let b_time = NaiveDateTime::from_timestamp_millis(b.timestamp).unwrap();
+        let a_time = a.timestamp;
+        let b_time = b.timestamp;
         a_time.cmp(&b_time)
     });
 

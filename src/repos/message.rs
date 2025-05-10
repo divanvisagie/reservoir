@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use crate::models::message_node::MessageNode;
+use crate::repos::config::{get_neo4j_password, get_neo4j_uri, get_neo4j_user};
 use anyhow::Error;
 use neo4rs::*;
-use crate::repos::config::{get_neo4j_uri, get_neo4j_user, get_neo4j_password};
-use tracing::{info, error};
+use tracing::{error, info};
 
 pub trait MessageRepository {
     async fn save_message_node(&self, message_node: &MessageNode) -> Result<(), Error>;
@@ -253,15 +253,17 @@ impl MessageRepository for Neo4jMessageRepository {
                score
         ORDER BY score DESC
     ";
-        let mut result = graph.execute(
-            query(query_text)
-                .param("embedding", embedding)
-                .param("topKExtended", top_k_extended)
-                .param("traceId", trace_id)
-                .param("partition", partition)
-                .param("instance", instance)
-                .param("role", "user"),
-        ).await?;
+        let mut result = graph
+            .execute(
+                query(query_text)
+                    .param("embedding", embedding)
+                    .param("topKExtended", top_k_extended)
+                    .param("traceId", trace_id)
+                    .param("partition", partition)
+                    .param("instance", instance)
+                    .param("role", "user"),
+            )
+            .await?;
         let mut content_map: HashMap<String, (MessageNode, f64)> = HashMap::new();
         while let Ok(Some(row)) = result.next().await {
             let content_str: Option<String> = row.get("content")?;
@@ -404,7 +406,9 @@ impl MessageRepository for Neo4jMessageRepository {
             MATCH p=(m:MessageNode {trace_id: $trace_id})-[:SYNAPSE*1..10]-(n:MessageNode)
             RETURN nodes(p) AS allNodes
         "#;
-        let mut result = graph.execute(query(q).param("trace_id", node.trace_id.clone())).await?;
+        let mut result = graph
+            .execute(query(q).param("trace_id", node.trace_id.clone()))
+            .await?;
         let mut connected_nodes = Vec::new();
         while let Ok(Some(row)) = result.next().await {
             let nodes: Vec<MessageNode> = row.get("allNodes")?;
@@ -507,6 +511,9 @@ mod tests {
         assert!(result.is_ok());
         let result = repo.get_message_node(trace_id).await;
         // Should return an error or None, but should not panic
-        assert!(result.is_err(), "Message node should not be found after deletion");
+        assert!(
+            result.is_err(),
+            "Message node should not be found after deletion"
+        );
     }
 }
