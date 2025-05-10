@@ -1,4 +1,5 @@
 use clap::Parser;
+use tracing::info;
 use crate::repos::message::{MessageRepository, Neo4jMessageRepository};
 use anyhow::Error;
 use crate::clients::openai::embeddings::get_embeddings_for_text;
@@ -75,6 +76,7 @@ pub async fn execute(
         let messages: Vec<Message> = results.iter().map(|m| m.to_message()).collect();
         Ok(messages)
     } else {
+        info!("Keyword search: fetching messages for partition {}", partition);
         // Keyword search: fetch all messages and filter by keyword
         let messages = repo.get_messages_for_partition(Some(&partition)).await?;
         let filtered: Vec<Message> = messages.iter()
