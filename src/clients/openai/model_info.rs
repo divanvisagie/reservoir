@@ -37,9 +37,7 @@ pub struct ModelInfo {
 }
 
 impl ModelInfo {
-    pub fn new(
-        name: String,
-    ) -> Self {
+    pub fn new(name: String) -> Self {
         match name.as_str() {
             "gpt-4.1" => Self::new_gpt_4_1(),
             "gpt-4o" => Self::new_gpt_4o(),
@@ -112,12 +110,16 @@ impl ModelInfo {
     }
 
     fn default(name: String) -> ModelInfo {
+        let ollama_base_url_from_env =
+            env::var("OLLAMA_BASE_URL").unwrap_or("http://localhost:11434".to_string());
+        let base_url = format!("{}/v1/chat/completions", ollama_base_url_from_env);
+
         ModelInfo {
             input_tokens: 128_000,
             output_tokens: 2048,
             name,
-            key: "".to_string(),
-            base_url: ollama_base_url(),
+            key: env::var("OLLAMA_API_KEY").unwrap_or_default(),
+            base_url,
         }
     }
 }
