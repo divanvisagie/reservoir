@@ -19,8 +19,14 @@ pub async fn run(repo: &Neo4jMessageRepository, cmd: &IngestSubCommand) -> Resul
     let partition = cmd.partition.clone().unwrap_or_else(|| "default".to_string());
     let instance = cmd.instance.clone().unwrap_or_else(|| partition.clone());
     let trace_id = Uuid::new_v4().to_string();
+    let role = cmd.role.clone().unwrap_or_else(|| "user".to_string());
+    let allowed_roles = ["user", "assistant", "system"];
+    if !allowed_roles.contains(&role.as_str()) {
+        eprintln!("Error: role must be one of: user, assistant, system");
+        return Ok(());
+    }
     let message = Message {
-        role: "user".to_string(),
+        role,
         content: content.clone(),
     };
     let embedding = get_embeddings_for_text(&content).await?.first().unwrap().embedding.clone();

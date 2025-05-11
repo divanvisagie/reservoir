@@ -85,4 +85,7 @@ pub struct IngestSubCommand {
     /// Instance to save the message in (defaults to partition)
     #[arg(short, long)]
     pub instance: Option<String>,
+    /// Role to assign to the message (defaults to "user")
+    #[arg(long)]
+    pub role: Option<String>,
 }
