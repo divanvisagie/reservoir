@@ -201,6 +201,9 @@ async fn main() -> Result<(), Error> {
         Some(SubCommands::Search(ref search_cmd)) => {
             commands::search::run(&repo, search_cmd).await?;
         }
+        Some(SubCommands::Ingest(ref ingest_cmd)) => {
+            commands::ingest::run(&repo, ingest_cmd).await?;
+        }
         None => {}
     };
     Ok(())

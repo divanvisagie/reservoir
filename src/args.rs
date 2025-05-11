@@ -33,6 +33,8 @@ pub enum SubCommands {
     View(ViewSubCommand),
     /// Search messages by keyword or semantic similarity
     Search(crate::commands::search::SearchSubCommand),
+    /// Ingest a message from stdin as a user MessageNode
+    Ingest(IngestSubCommand),
 }
 
 #[derive(Parser, Debug)]
@@ -70,6 +72,17 @@ pub struct ViewSubCommand {
     #[arg(short, long)]
     pub partition: Option<String>,
     /// Instance to view (defaults to partition)
+    #[arg(short, long)]
+    pub instance: Option<String>,
+}
+
+#[derive(Parser, Debug)]
+#[command(author, version, about = "Ingest a message from stdin as a user MessageNode", long_about = None)]
+pub struct IngestSubCommand {
+    /// Partition to save the message in (defaults to "default")
+    #[arg(short, long)]
+    pub partition: Option<String>,
+    /// Instance to save the message in (defaults to partition)
     #[arg(short, long)]
     pub instance: Option<String>,
 }
