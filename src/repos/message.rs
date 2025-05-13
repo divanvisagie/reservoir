@@ -63,6 +63,7 @@ impl Neo4jMessageRepository {
 
     pub async fn init_vector_index(&self) -> Result<(), Error> {
         let index_name = "messageEmbeddings";
+        let emneddings_index_name = "messageEmbeddings";
         let graph = self.connect().await?;
         // Check if index already exists
         let check_query = query("SHOW INDEXES YIELD name RETURN name");
@@ -84,8 +85,15 @@ impl Neo4jMessageRepository {
                 'embedding',
                 1536,
                 'cosine'
+            );
+            CALL db.index.vector.createNodeIndex(
+                '{}_embedding',
+                'EmbeddingNode',
+                'embedding',
+                1536,
+                'cosine'
             )",
-            index_name
+            index_name, emneddings_index_name
         );
         let result = graph.execute(query(&create_query)).await;
         match result {
@@ -129,7 +137,8 @@ impl MessageRepository for Neo4jMessageRepository {
 
         let graph = self.connect().await?;
         let create_q = query(
-            r#"CREATE (m:MessageNode {
+            r#"
+            CREATE (m:MessageNode {
                 trace_id: $trace_id,
                 content: $content,
                 role: $role,
@@ -138,7 +147,14 @@ impl MessageRepository for Neo4jMessageRepository {
                 instance: $instance,
                 embedding: $embedding,
                 url: $url
-            }) RETURN id(m) AS nodeId"#,
+            })
+            CREATE (e:EmbeddingNode {
+                model: 'text-embedding-ada-002',
+                embedding: $embedding
+            })
+            CREATE (m)-[:HAS_EMBEDDING]->(e)
+            RETURN id(m) AS nodeId, id(e) AS embeddingNodeId
+            "#
         )
         .param("trace_id", message_node.trace_id.clone())
         .param("content", message_node.content.clone())
