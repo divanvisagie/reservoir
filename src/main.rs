@@ -9,6 +9,7 @@ use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::body::Incoming;
 use hyper::{Method, Request, Response, StatusCode};
+use repos::message::AnyMessageRepository;
 use repos::message::Neo4jMessageRepository;
 use std::convert::Infallible;
 use tracing::{error, info};
@@ -117,7 +118,7 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
                 return Ok(response);
             }
 
-            let repo = Neo4jMessageRepository::default();
+            let repo = AnyMessageRepository::new_neo4j();
             let result = search_execute(&repo, partition, instance, count, term, semantic).await;
             match result {
                 Ok(output) => {
@@ -148,7 +149,7 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
             // convert to usize
             let count = count as usize;
 
-            let repo = Neo4jMessageRepository::default();
+            let repo = AnyMessageRepository::new_neo4j();
 
             let result = execute(&repo, partition, instance, count).await;
 
@@ -181,7 +182,7 @@ async fn main() -> Result<(), Error> {
         .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "reservoir=info".to_string()))
         .init();
     let args = Args::parse();
-    let repo = Neo4jMessageRepository::default();
+    let repo = AnyMessageRepository::new_neo4j();
     match args.subcmd {
         Some(SubCommands::Start(_)) => {
             commands::start::run(&repo).await?;

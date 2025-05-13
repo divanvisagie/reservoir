@@ -1,12 +1,12 @@
-use crate::repos::message::Neo4jMessageRepository;
-use anyhow::Error;
 use crate::repos::config::get_reservoir_port;
+use crate::repos::message::AnyMessageRepository;
+use anyhow::Error;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper_util::rt::TokioIo;
-use tokio::net::TcpListener;
 use std::net::SocketAddr;
-use tracing::{info, error};
+use tokio::net::TcpListener;
+use tracing::{error, info};
 
 use crate::handle;
 
@@ -27,8 +27,7 @@ pub async fn start_server() -> Result<(), Error> {
             }
         });
     }
-} 
-pub async fn run(repo: &Neo4jMessageRepository) -> Result<(), Error> {
-    repo.init_vector_index().await?;
+}
+pub async fn run(_repo: &AnyMessageRepository) -> Result<(), Error> {
     start_server().await
-} 
+}

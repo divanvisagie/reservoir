@@ -1,6 +1,6 @@
 use clap::Parser;
 use tracing::info;
-use crate::repos::message::{MessageRepository, Neo4jMessageRepository};
+use crate::repos::message::{AnyMessageRepository, MessageRepository};
 use anyhow::Error;
 use crate::clients::openai::embeddings::get_embeddings_for_text;
 use crate::models::message_node::MessageNode;
@@ -22,7 +22,7 @@ pub struct SearchSubCommand {
     pub instance: Option<String>,
 }
 
-pub async fn run(repo: &Neo4jMessageRepository, cmd: &SearchSubCommand) -> Result<(), Error> {
+pub async fn run(repo: &AnyMessageRepository, cmd: &SearchSubCommand) -> Result<(), Error> {
     if cmd.semantic {
         let partition = cmd.partition.clone().unwrap_or_else(|| "default".to_string());
         let instance = cmd.instance.clone().unwrap_or_else(|| partition.clone());
@@ -55,7 +55,7 @@ pub async fn run(repo: &Neo4jMessageRepository, cmd: &SearchSubCommand) -> Resul
 }
 
 pub async fn execute(
-    repo: &Neo4jMessageRepository,
+    repo: &AnyMessageRepository,
     partition: String,
     instance: String,
     count: usize,

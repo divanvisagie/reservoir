@@ -15,6 +15,33 @@ pub trait EmbeddingRepository {
     ) -> Result<Vec<EmbeddingNode>, Error>;
 }
 
+pub enum AnyEmbeddingRepository {
+    Neo4j(Neo4jEmbeddingRepository),
+}
+
+impl AnyEmbeddingRepository {
+    pub fn new_neo4j(uri: String, user: String, pass: String) -> Self {
+        AnyEmbeddingRepository::Neo4j(Neo4jEmbeddingRepository::new(uri, user, pass))
+    }
+}
+
+impl EmbeddingRepository for AnyEmbeddingRepository {
+    async fn find_similar_embeddings(
+        &self,
+        embedding: Vec<f32>,
+        partition: &str,
+        instance: &str,
+        top_k: usize,
+    ) -> Result<Vec<EmbeddingNode>, Error> {
+        match self {
+            AnyEmbeddingRepository::Neo4j(repo) => {
+                repo.find_similar_embeddings(embedding, partition, instance, top_k)
+                    .await
+            }
+        }
+    }
+}
+
 pub struct Neo4jEmbeddingRepository {
     uri: String,
     user: String,
@@ -57,7 +84,7 @@ impl EmbeddingRepository for Neo4jEmbeddingRepository {
             WITH e, algo.similarity.cosine(e.embedding, $embedding) 
             AS similarity 
             RETURN e ORDER BY similarity DESC LIMIT {}
-            "#
+            "#,
         )
         .param("embedding", embedding)
         .param("partition", partition)

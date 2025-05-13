@@ -1,11 +1,11 @@
 use crate::args::ViewSubCommand;
 use crate::clients::openai::types::Message;
-use crate::repos::message::{MessageRepository, Neo4jMessageRepository};
+use crate::repos::message::{AnyMessageRepository, MessageRepository};
 use anyhow::Error;
-use tracing::{info, error};
+use tracing::{error, info};
 
 pub async fn execute(
-    repo: &Neo4jMessageRepository,
+    repo: &AnyMessageRepository,
     partition: String,
     instance: String,
     count: usize,
@@ -19,13 +19,11 @@ pub async fn execute(
         a_time.cmp(&b_time)
     });
 
-    let messages: Vec<Message> = messages.iter().map(|m| {
-        m.to_message()
-    }).collect();
+    let messages: Vec<Message> = messages.iter().map(|m| m.to_message()).collect();
     Ok(messages)
 }
 
-pub async fn run(repo: &Neo4jMessageRepository, view_cmd: &ViewSubCommand) -> Result<(), Error> {
+pub async fn run(repo: &AnyMessageRepository, view_cmd: &ViewSubCommand) -> Result<(), Error> {
     let partition = view_cmd
         .partition
         .clone()

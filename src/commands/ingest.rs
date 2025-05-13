@@ -1,4 +1,4 @@
-use crate::repos::message::{Neo4jMessageRepository, MessageRepository};
+use crate::repos::message::{AnyMessageRepository, MessageRepository};
 use crate::models::message_node::MessageNode;
 use crate::clients::openai::embeddings::get_embeddings_for_text;
 use crate::clients::openai::types::Message;
@@ -7,7 +7,7 @@ use uuid::Uuid;
 use std::io::{self, Read};
 use crate::args::IngestSubCommand;
 
-pub async fn run(repo: &Neo4jMessageRepository, cmd: &IngestSubCommand) -> Result<(), Error> {
+pub async fn run(repo: &AnyMessageRepository, cmd: &IngestSubCommand) -> Result<(), Error> {
     // Read stdin
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer)?;
