@@ -5,6 +5,7 @@ edition = "2021"
 repository = "https://github.com/sector-f-labs/reservoir"
 authors = ["Divan Visagie <me@divanv.com>"]
 license = "Apache-2.0"
+description = "Store all your LLM Interactions"
 
 [dependencies]
 tokio       = { version = "1.45.0", features = ["full"] }
