@@ -6,8 +6,9 @@
     <string>com.sectorflabs.reservoir</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/divan/.cargo/bin/rsrvr</string>
-        <string>start</string>
+        <string>/bin/zsh</string>
+        <string>-c</string>
+        <string>source ~/.zshrc && /Users/divan/.cargo/bin/rsrvr start</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
