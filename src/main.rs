@@ -119,7 +119,10 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
             }
 
             let repo = AnyMessageRepository::new_neo4j();
-            let result = search_execute(&repo, partition, instance, count, term, semantic).await;
+            let result = search_execute(
+                &repo, partition, instance, count, term, semantic, false, false,
+            )
+            .await;
             match result {
                 Ok(output) => {
                     let json = serde_json::to_string(&output).unwrap();

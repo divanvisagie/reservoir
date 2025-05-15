@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::clients::openai::types::Message;
 
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct MessageNode {
     pub trace_id: String,
     pub partition: String,

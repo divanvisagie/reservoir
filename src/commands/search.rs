@@ -1,10 +1,10 @@
-use clap::Parser;
-use tracing::info;
+use crate::clients::openai::embeddings::get_embeddings_for_text;
+use crate::clients::openai::types::Message;
 use crate::repos::message::{AnyMessageRepository, MessageRepository};
 use anyhow::Error;
-use crate::clients::openai::embeddings::get_embeddings_for_text;
-use crate::models::message_node::MessageNode;
-use crate::clients::openai::types::Message;
+use clap::Parser;
+use tracing::info;
+use crate::utils::deduplicate_message_nodes;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Search messages by keyword or semantic similarity", long_about = None)]
@@ -20,38 +20,48 @@ pub struct SearchSubCommand {
     /// Instance to search (defaults to partition)
     #[arg(short, long)]
     pub instance: Option<String>,
+    /// Use the same search strategy as rag does when injecting
+    /// into the model
+    #[arg(short, long)]
+    pub rag: bool,
+    /// Deuplicate first similarity results
+    #[arg(short, long)]
+    pub deduplicate: bool,
 }
 
 pub async fn run(repo: &AnyMessageRepository, cmd: &SearchSubCommand) -> Result<(), Error> {
-    if cmd.semantic {
-        let partition = cmd.partition.clone().unwrap_or_else(|| "default".to_string());
-        let instance = cmd.instance.clone().unwrap_or_else(|| partition.clone());
-        // Semantic search: get embedding for the term, then use find_similar_messages
-        let embeddings = get_embeddings_for_text(&cmd.term).await?;
-        let embedding = embeddings.first().map(|e| e.embedding.clone()).unwrap_or_default();
-        let results = repo.find_similar_messages(
-            embedding,
-            "search-trace-id",
-            &partition,
-            &instance,
-            10,
-        ).await?;
-        for (i, msg) in results.iter().enumerate() {
-            // If MessageNode had a score, print it; otherwise, just print the message
-            // Here, we don't have score, so just print index as a placeholder
-            println!("{}. [{}] {}: {}", i + 1, msg.trace_id, msg.role, msg.content.as_deref().unwrap_or(""));
+    let partition = cmd
+        .partition
+        .clone()
+        .unwrap_or_else(|| "default".to_string());
+    let instance = cmd.instance.clone().unwrap_or_else(|| partition.clone());
+    let count = 10; // Default count for CLI search
+    match execute(
+        repo,
+        partition,
+        instance,
+        count,
+        cmd.term.clone(),
+        cmd.semantic,
+        cmd.rag,
+        cmd.deduplicate
+    ).await {
+        Ok(messages) => {
+            for (i, msg) in messages.iter().enumerate() {
+                println!(
+                    "{}. {}: {}",
+                    i + 1,
+                    msg.role,
+                    msg.content
+                );
+            }
+            Ok(())
         }
-    } else {
-        // Keyword search: fetch all messages and filter by keyword
-        let messages = repo.get_messages_for_partition(None).await?;
-        let filtered: Vec<&MessageNode> = messages.iter()
-            .filter(|m| m.content.as_deref().unwrap_or("").to_lowercase().contains(&cmd.term.to_lowercase()))
-            .collect();
-        for msg in filtered {
-            println!("[{}] {}: {}", msg.trace_id, msg.role, msg.content.as_deref().unwrap_or(""));
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            Err(e)
         }
     }
-    Ok(())
 }
 
 pub async fn execute(
@@ -61,29 +71,58 @@ pub async fn execute(
     count: usize,
     term: String,
     semantic: bool,
+    rag: bool,
+    deduplicate: bool,
 ) -> Result<Vec<Message>, Error> {
     if semantic {
-        // Semantic search: get embedding for the term, then use find_similar_messages
         let embeddings = get_embeddings_for_text(&term).await?;
-        let embedding = embeddings.first().map(|e| e.embedding.clone()).unwrap_or_default();
-        let results = repo.find_similar_messages(
-            embedding,
-            "search-trace-id",
-            &partition,
-            &instance,
-            count,
-        ).await?;
-        let messages: Vec<Message> = results.iter().map(|m| m.to_message()).collect();
+        let embedding = embeddings
+            .first()
+            .map(|e| e.embedding.clone())
+            .unwrap_or_default();
+        let mut similar = repo
+            .find_similar_messages(embedding, "search-trace-id", &partition, &instance, count)
+            .await?;
+        if deduplicate {
+            similar = deduplicate_message_nodes(similar);
+        }
+        if rag {
+            let similar_pairs = repo.find_connections_between_nodes(&similar).await?;
+            similar.extend(similar_pairs);
+            let first = similar.first().cloned();
+            similar = match first {
+                Some(first) => {
+                    let nodes = repo.find_nodes_connected_to_node(&first).await?;
+                    let nodes = deduplicate_message_nodes(nodes);
+                    if nodes.len() > 2 {
+                        nodes
+                    } else {
+                        similar
+                    }
+                }
+                None => similar,
+            };
+        }
+        let messages: Vec<Message> = similar.iter().map(|m| m.to_message()).collect();
         Ok(messages)
     } else {
-        info!("Keyword search: fetching messages for partition {}", partition);
-        // Keyword search: fetch all messages and filter by keyword
+        info!(
+            "Keyword search: fetching messages for partition {}",
+            partition
+        );
         let messages = repo.get_messages_for_partition(Some(&partition)).await?;
-        let filtered: Vec<Message> = messages.iter()
-            .filter(|m| m.content.as_deref().unwrap_or("").to_lowercase().contains(&term.to_lowercase()))
+        let filtered: Vec<Message> = messages
+            .iter()
+            .filter(|m| {
+                m.content
+                    .as_deref()
+                    .unwrap_or("")
+                    .to_lowercase()
+                    .contains(&term.to_lowercase())
+            })
             .take(count)
             .map(|m| m.to_message())
             .collect();
         Ok(filtered)
     }
-} 
+}

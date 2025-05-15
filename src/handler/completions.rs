@@ -115,6 +115,7 @@ pub async fn handle_with_partition(
     } else {
         Vec::new()
     };
+    similar = deduplicate_message_nodes(similar);
 
     let similar_pairs = message_repo.find_connections_between_nodes(&similar).await?;
     similar.extend(similar_pairs);

@@ -376,38 +376,23 @@ impl MessageRepository for Neo4jMessageRepository {
                     .param("role", "user"),
             )
             .await?;
-        let mut content_map: HashMap<String, (MessageNode, f64)> = HashMap::new();
+        let mut messages: Vec<(MessageNode, f64)> = Vec::new();
         while let Ok(Some(row)) = result.next().await {
-            let content_str: Option<String> = row.get("content")?;
-            let content_key = content_str
-                .as_ref()
-                .map(|c| c.to_lowercase().trim().to_string())
-                .unwrap_or_default();
-            if content_key.is_empty() {
-                continue;
-            }
-            let score: f64 = row.get("score")?;
             let message = MessageNode {
                 trace_id: row.get("trace_id")?,
                 partition: row.get("partition")?,
                 instance: row.get("instance")?,
                 role: row.get("role")?,
-                content: content_str.clone(),
+                content: row.get("content")?,
                 embedding: row.get("embedding")?,
                 url: row.get("url")?,
                 timestamp: row.get("timestamp")?,
             };
-            match content_map.get(&content_key) {
-                Some((_, existing_score)) if *existing_score >= score => {}
-                _ => {
-                    content_map.insert(content_key, (message, score));
-                }
-            }
+            let score: f64 = row.get("score")?;
+            messages.push((message, score));
         }
-        let mut deduped_messages: Vec<_> =
-            content_map.into_iter().map(|(_, (m, s))| (m, s)).collect();
-        deduped_messages.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        let messages: Vec<MessageNode> = deduped_messages
+        messages.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let messages: Vec<MessageNode> = messages
             .into_iter()
             .take(top_k)
             .map(|(m, _score)| m)
