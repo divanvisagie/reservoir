@@ -1,10 +1,10 @@
 use crate::clients::openai::embeddings::get_embeddings_for_text;
 use crate::clients::openai::types::Message;
 use crate::repos::message::{AnyMessageRepository, MessageRepository};
+use crate::utils::deduplicate_message_nodes;
 use anyhow::Error;
 use clap::Parser;
 use tracing::info;
-use crate::utils::deduplicate_message_nodes;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Search messages by keyword or semantic similarity", long_about = None)]
@@ -20,10 +20,10 @@ pub struct SearchSubCommand {
     /// Instance to search (defaults to partition)
     #[arg(short, long)]
     pub instance: Option<String>,
-    /// Use the same search strategy as rag does when injecting
+    /// Use the same search strategy as RAG does when injecting
     /// into the model
     #[arg(short, long)]
-    pub rag: bool,
+    pub link: bool,
     /// Deuplicate first similarity results
     #[arg(short, long)]
     pub deduplicate: bool,
@@ -43,17 +43,14 @@ pub async fn run(repo: &AnyMessageRepository, cmd: &SearchSubCommand) -> Result<
         count,
         cmd.term.clone(),
         cmd.semantic,
-        cmd.rag,
-        cmd.deduplicate
-    ).await {
+        cmd.link,
+        cmd.deduplicate,
+    )
+    .await
+    {
         Ok(messages) => {
             for (i, msg) in messages.iter().enumerate() {
-                println!(
-                    "{}. {}: {}",
-                    i + 1,
-                    msg.role,
-                    msg.content
-                );
+                println!("{}. {}: {}", i + 1, msg.role, msg.content);
             }
             Ok(())
         }
@@ -71,7 +68,7 @@ pub async fn execute(
     count: usize,
     term: String,
     semantic: bool,
-    rag: bool,
+    link: bool,
     deduplicate: bool,
 ) -> Result<Vec<Message>, Error> {
     if semantic {
@@ -86,7 +83,7 @@ pub async fn execute(
         if deduplicate {
             similar = deduplicate_message_nodes(similar);
         }
-        if rag {
+        if link {
             let similar_pairs = repo.find_connections_between_nodes(&similar).await?;
             similar.extend(similar_pairs);
             let first = similar.first().cloned();
