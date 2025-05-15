@@ -1,0 +1,38 @@
+{
+  "models": [
+    {
+      "name": "deepseek-r1:latest",
+      "model": "deepseek-r1:latest",
+      "modified_at": "2025-05-10T08:06:48.639712648-07:00",
+      "size": 4683075271,
+      "digest": "0a8c266910232fd3291e71e5ba1e058cc5af9d411192cf88b6d30e92b6e73163",
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "qwen2",
+        "families": [
+          "qwen2"
+        ],
+        "parameter_size": "7.6B",
+        "quantization_level": "Q4_K_M"
+      }
+    },
+    {
+      "name": "llama3.2:latest",
+      "model": "llama3.2:latest",
+      "modified_at": "2025-05-04T17:37:44.706015396-07:00",
+      "size": 2019393189,
+      "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "llama",
+        "families": [
+          "llama"
+        ],
+        "parameter_size": "3.2B",
+        "quantization_level": "Q4_K_M"
+      }
+    }
+  ]
+} 
