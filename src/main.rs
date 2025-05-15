@@ -55,6 +55,27 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
     info!("Received request: {} {}", req.method(), req.uri().path());
 
     match (req.method(), req.uri().path()) {
+        (&Method::GET, "/api/tags") => {
+            // Create a response with llama3.3 model info
+            let model_info = serde_json::json!({
+                "models": [
+                    {
+                        "name": "llama3.2",
+                        "modified_at": chrono::Utc::now().to_rfc3339(),
+                        "size": 4_000_000, // Example size in bytes
+                        "digest": "sha256:1234567890abcdef" // Example digest
+                    }
+                ]
+            });
+            
+            let response = Response::builder()
+                .header("Content-Type", "application/json")
+                .body(Full::new(Bytes::from(model_info.to_string())))
+                .unwrap();
+            
+            Ok(response)
+        }
+
         (&Method::POST, path) if is_chat_request(path) => {
             info!("Chat request: {}", path);
             let partition = get_partition_from_path(path);
