@@ -40,6 +40,12 @@ pub enum SubCommands {
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Start the Reservoir proxy", long_about = None)]
 pub struct StartSubCommand {
+
+    /// Ollama mode which sets up on same default port as ollama
+    /// useful for using as a proxy for clients that don't support
+    /// setting a url
+    #[arg(short, long)]
+    pub ollama: bool,
 }
 
 #[derive(Parser, Debug)]

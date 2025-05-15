@@ -10,8 +10,7 @@ use tracing::{error, info};
 
 use crate::handle;
 
-pub async fn start_server() -> Result<(), Error> {
-    let port = get_reservoir_port();
+pub async fn start_server(port: u16) -> Result<(), Error> {
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let listener = TcpListener::bind(addr).await?;
     info!("Listening on http://{}", addr);
@@ -28,6 +27,8 @@ pub async fn start_server() -> Result<(), Error> {
         });
     }
 }
-pub async fn run(_repo: &AnyMessageRepository) -> Result<(), Error> {
-    start_server().await
+
+pub async fn run(_repo: &AnyMessageRepository, ollama: bool) -> Result<(), Error> {
+    let port = if ollama { 11434 } else { get_reservoir_port() };
+    start_server(port).await
 }

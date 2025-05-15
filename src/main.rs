@@ -187,8 +187,8 @@ async fn main() -> Result<(), Error> {
     let args = Args::parse();
     let repo = AnyMessageRepository::new_neo4j();
     match args.subcmd {
-        Some(SubCommands::Start(_)) => {
-            commands::start::run(&repo).await?;
+        Some(SubCommands::Start(ref start_cmd)) => {
+            commands::start::run(&repo, start_cmd.ollama).await?;
         }
         Some(SubCommands::Config(_config_subcmd)) => {
             commands::config::run().await?;
