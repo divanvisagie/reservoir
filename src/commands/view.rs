@@ -37,7 +37,7 @@ pub async fn run(repo: &AnyMessageRepository, view_cmd: &ViewSubCommand) -> Resu
         Ok(output) => {
             // pretty print
             for message in output {
-                info!("{}: - {}", message.role, message.content);
+                println!("{}: - {}", message.role, message.content);
             }
             Ok(())
         }
