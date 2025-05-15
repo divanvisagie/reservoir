@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sectorflabs.reservoir</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/divan/.cargo/bin/rsrvr</string>
+        <string>start</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/reservoir.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/reservoir.err</string>
+</dict>
+</plist>
