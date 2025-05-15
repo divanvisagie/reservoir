@@ -8,7 +8,7 @@
     <array>
         <string>/bin/zsh</string>
         <string>-c</string>
-        <string>source ~/.zshrc && /Users/divan/.cargo/bin/rsrvr start</string>
+        <string>source ~/.zshrc && /Users/divan/.cargo/bin/reservoir start</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
