@@ -1,6 +1,9 @@
 .PHONY: install-service uninstall-service
 
 main:
+	cargo build --release
+
+run:
 	cargo run -- start
 
 dev:

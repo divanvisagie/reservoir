@@ -151,12 +151,6 @@ dependencies = [
 
 [[package]]
 name = "base64"
-version = "0.21.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
-
-[[package]]
-name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
@@ -796,9 +790,9 @@ dependencies = [
 
 [[package]]
 name = "hyper-util"
-version = "0.1.11"
+version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "497bbc33a26fdd4af9ed9c70d63f61cf56a938375fbb32df34db9b1cd6d643f2"
+checksum = "cf9f1e950e0d9d1d3c47184416723cf29c0d1f93bd8cccf37e4beb6b44f31710"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -1264,6 +1258,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d05e27ee213611ffe7d6348b942e8f942b37114c00cc03cec254295a4a17852e"
 
 [[package]]
+name = "openssl-src"
+version = "300.5.0+3.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8ce546f549326b0e6052b649198487d91320875da901e7bd11a06d1ee3f9c2f"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "openssl-sys"
 version = "0.9.108"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1271,6 +1274,7 @@ checksum = "e145e1651e858e820e4860f7b9c5e169bc1d8ce1c86043be79fa7b7634821847"
 dependencies = [
  "cc",
  "libc",
+ "openssl-src",
  "pkg-config",
  "vcpkg",
 ]
@@ -1523,7 +1527,7 @@ version = "0.12.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d19c46a6fdd48bc4dab94b6103fccc55d34c67cc0ad04653aad4ea2a07cd7bbb"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "bytes",
  "encoding_rs",
  "futures-core",
@@ -1602,7 +1606,7 @@ dependencies = [
 
 [[package]]
 name = "rsrvr"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1617,6 +1621,8 @@ dependencies = [
  "neo4rs",
  "once_cell",
  "openai",
+ "openssl",
+ "openssl-sys",
  "reqwest",
  "serde",
  "serde_json",
@@ -1994,16 +2000,15 @@ dependencies = [
 
 [[package]]
 name = "tiktoken-rs"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44075987ee2486402f0808505dd65692163d243a337fc54363d49afac41087f6"
+checksum = "25563eeba904d770acf527e8b370fe9a5547bacd20ff84a0b6c3bc41288e5625"
 dependencies = [
  "anyhow",
- "base64 0.21.7",
+ "base64",
  "bstr",
  "fancy-regex",
  "lazy_static",
- "parking_lot",
  "regex",
  "rustc-hash",
 ]
