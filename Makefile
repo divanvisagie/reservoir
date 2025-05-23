@@ -3,6 +3,9 @@
 main:
 	cargo build --release
 
+migrate:
+	./scripts/migrations.sh
+
 run:
 	cargo run -- start
 
