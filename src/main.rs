@@ -9,12 +9,12 @@ use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::body::Incoming;
 use hyper::{Method, Request, Response, StatusCode};
+use repos::embedding::AnyEmbeddingRepository;
 use repos::message::AnyMessageRepository;
 use repos::message::Neo4jMessageRepository;
+use services::ChatRequestService;
 use std::convert::Infallible;
 use tracing::{error, info};
-use std::fs;
-use std::path::Path;
 
 mod args;
 mod clients;
@@ -130,8 +130,11 @@ async fn handle(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infalli
             }
 
             let repo = AnyMessageRepository::new_neo4j();
+            let embeddings_repo = AnyEmbeddingRepository::new_neo4j();
+            let service = ChatRequestService::new(&repo, &embeddings_repo);
+
             let result = search_execute(
-                &repo, partition, instance, count, term, semantic, false, false,
+                &service, partition, instance, count, term, semantic, false, false,
             )
             .await;
             match result {
@@ -205,28 +208,31 @@ async fn main() -> Result<(), Error> {
         .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "reservoir=info".to_string()))
         .init();
     let args = Args::parse();
-    let repo = AnyMessageRepository::new_neo4j();
+    let message_repo = AnyMessageRepository::new_neo4j();
+    let embedding_repo = AnyEmbeddingRepository::new_neo4j();
+    let service = ChatRequestService::new(&message_repo, &embedding_repo);
+
     match args.subcmd {
         Some(SubCommands::Start(ref start_cmd)) => {
-            commands::start::run(&repo, start_cmd.ollama).await?;
+            commands::start::run(&message_repo, start_cmd.ollama).await?;
         }
         Some(SubCommands::Config(_config_subcmd)) => {
             commands::config::run().await?;
         }
         Some(SubCommands::Export) => {
-            commands::export::run(&repo).await?;
+            commands::export::run(&message_repo).await?;
         }
         Some(SubCommands::Import(import_cmd)) => {
-            commands::import::run(&repo, &import_cmd.file).await?;
+            commands::import::run(&message_repo, &import_cmd.file).await?;
         }
         Some(SubCommands::View(ref view_cmd)) => {
-            commands::view::run(&repo, view_cmd).await?;
+            commands::view::run(&message_repo, view_cmd).await?;
         }
         Some(SubCommands::Search(ref search_cmd)) => {
-            commands::search::run(&repo, search_cmd).await?;
+            commands::search::run(&service, search_cmd).await?;
         }
         Some(SubCommands::Ingest(ref ingest_cmd)) => {
-            commands::ingest::run(&repo, ingest_cmd).await?;
+            commands::ingest::run(&message_repo, ingest_cmd).await?;
         }
         None => {}
     };

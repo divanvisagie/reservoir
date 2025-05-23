@@ -1,6 +1,7 @@
 use crate::clients::openai::embeddings::get_embeddings_for_text;
 use crate::clients::openai::types::Message;
 use crate::repos::message::{AnyMessageRepository, MessageRepository};
+use crate::services::ChatRequestService;
 use crate::utils::deduplicate_message_nodes;
 use anyhow::Error;
 use clap::Parser;
@@ -29,7 +30,10 @@ pub struct SearchSubCommand {
     pub deduplicate: bool,
 }
 
-pub async fn run(repo: &AnyMessageRepository, cmd: &SearchSubCommand) -> Result<(), Error> {
+pub async fn run<'a>(
+    service: &'a ChatRequestService<'a>,
+    cmd: &SearchSubCommand,
+) -> Result<(), Error> {
     let partition = cmd
         .partition
         .clone()
@@ -37,7 +41,7 @@ pub async fn run(repo: &AnyMessageRepository, cmd: &SearchSubCommand) -> Result<
     let instance = cmd.instance.clone().unwrap_or_else(|| partition.clone());
     let count = 10; // Default count for CLI search
     match execute(
-        repo,
+        service,
         partition,
         instance,
         count,
@@ -61,8 +65,8 @@ pub async fn run(repo: &AnyMessageRepository, cmd: &SearchSubCommand) -> Result<
     }
 }
 
-pub async fn execute(
-    repo: &AnyMessageRepository,
+pub async fn execute<'a>(
+    service: &'a ChatRequestService<'a>,
     partition: String,
     instance: String,
     count: usize,
@@ -77,19 +81,19 @@ pub async fn execute(
             .first()
             .map(|e| e.embedding.clone())
             .unwrap_or_default();
-        let mut similar = repo
+        let mut similar = service
             .find_similar_messages(embedding, "search-trace-id", &partition, &instance, count)
             .await?;
         if deduplicate {
             similar = deduplicate_message_nodes(similar);
         }
         if link {
-            let similar_pairs = repo.find_connections_between_nodes(&similar).await?;
+            let similar_pairs = service.find_connections_between_nodes(&similar).await?;
             similar.extend(similar_pairs);
             let first = similar.first().cloned();
             similar = match first {
                 Some(first) => {
-                    let nodes = repo.find_nodes_connected_to_node(&first).await?;
+                    let nodes = service.find_nodes_connected_to_node(&first).await?;
                     let nodes = deduplicate_message_nodes(nodes);
                     if nodes.len() > 2 {
                         nodes
@@ -107,7 +111,7 @@ pub async fn execute(
             "Keyword search: fetching messages for partition {}",
             partition
         );
-        let messages = repo.get_messages_for_partition(Some(&partition)).await?;
+        let messages = service.get_messages_for_partition(Some(&partition)).await?;
         let filtered: Vec<Message> = messages
             .iter()
             .filter(|m| {

@@ -8,3 +8,4 @@ CREATE (e:Embedding {
 })
 CREATE (m)-[:HAS_EMBEDDING]->(e)
 RETURN id(m) AS nodeId, id(e) AS embeddingId
+

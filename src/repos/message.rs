@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-
-use crate::models::embedding_node::EmbeddingNode;
 use crate::models::message_node::MessageNode;
 use crate::repos::config::{get_neo4j_password, get_neo4j_uri, get_neo4j_user};
 use anyhow::Error;
@@ -27,7 +24,6 @@ pub trait MessageRepository {
         embedding_id: &str,
     ) -> Result<MessageNode, Error>;
 
-    #[allow(dead_code)]
     async fn get_messages_for_partition(
         &self,
         partition: Option<&str>,

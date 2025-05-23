@@ -1,5 +1,6 @@
 use anyhow::Error;
 use neo4rs::{query, ConfigBuilder, Graph};
+use tracing::{error, info};
 
 use crate::models::embedding_node::EmbeddingNode;
 
@@ -13,8 +14,6 @@ pub trait EmbeddingRepository {
         instance: &str,
         top_k: usize,
     ) -> Result<Vec<EmbeddingNode>, Error>;
-    
-    async fn get_embedding_node(&self, id: &str) -> Result<EmbeddingNode, Error>;
 }
 
 pub enum AnyEmbeddingRepository {
@@ -22,12 +21,8 @@ pub enum AnyEmbeddingRepository {
 }
 
 impl AnyEmbeddingRepository {
-    pub fn new_neo4j(uri: String, user: String, pass: String) -> Self {
-        AnyEmbeddingRepository::Neo4j(Neo4jEmbeddingRepository::new(uri, user, pass))
-    }
-    
-    pub fn clone_from_neo4j(repo: &Neo4jEmbeddingRepository) -> Self {
-        AnyEmbeddingRepository::Neo4j(repo.clone())
+    pub fn new_neo4j() -> Self {
+        AnyEmbeddingRepository::Neo4j(Neo4jEmbeddingRepository::default())
     }
 }
 
@@ -43,14 +38,6 @@ impl EmbeddingRepository for AnyEmbeddingRepository {
             AnyEmbeddingRepository::Neo4j(repo) => {
                 repo.find_similar_embeddings(embedding, partition, instance, top_k)
                     .await
-            }
-        }
-    }
-    
-    async fn get_embedding_node(&self, id: &str) -> Result<EmbeddingNode, Error> {
-        match self {
-            AnyEmbeddingRepository::Neo4j(repo) => {
-                repo.get_embedding_node(id).await
             }
         }
     }
@@ -73,7 +60,7 @@ impl Clone for Neo4jEmbeddingRepository {
 }
 
 impl Neo4jEmbeddingRepository {
-    pub fn new(uri: String, user: String, pass: String) -> Self {
+    pub fn default() -> Self {
         Neo4jEmbeddingRepository {
             uri: get_neo4j_uri(),
             user: get_neo4j_user(),
@@ -90,7 +77,7 @@ impl Neo4jEmbeddingRepository {
         let graph = Graph::connect(config).await?;
         Ok(graph)
     }
-    
+
     async fn get_embedding_node(&self, id: &str) -> Result<EmbeddingNode, Error> {
         let graph = self.connect().await?;
         let q = query(
@@ -99,19 +86,19 @@ impl Neo4jEmbeddingRepository {
             WHERE id(e) = toInteger($id)
             RETURN id(e) AS id, e.model AS model, e.embedding AS embedding, 
                    e.partition AS partition, e.instance AS instance
-            "#
+            "#,
         )
         .param("id", id);
 
         let mut result = graph.execute(q).await?;
-        
+
         if let Some(row) = result.next().await? {
             let id = row.get::<i64>("id")?.to_string();
             let model = row.get::<String>("model")?;
             let embedding = row.get::<Vec<f32>>("embedding")?;
             let partition = row.get::<String>("partition").ok();
             let instance = row.get::<String>("instance").ok();
-            
+
             Ok(EmbeddingNode {
                 id: Some(id),
                 model,
@@ -126,11 +113,6 @@ impl Neo4jEmbeddingRepository {
 }
 
 impl EmbeddingRepository for Neo4jEmbeddingRepository {
-    async fn get_embedding_node(&self, id: &str) -> Result<EmbeddingNode, Error> {
-        // Call the instance method with the same name
-        Neo4jEmbeddingRepository::get_embedding_node(self, id).await
-    }
-    
     async fn find_similar_embeddings(
         &self,
         embedding: Vec<f32>,
@@ -138,42 +120,56 @@ impl EmbeddingRepository for Neo4jEmbeddingRepository {
         instance: &str,
         top_k: usize,
     ) -> Result<Vec<EmbeddingNode>, Error> {
+        let top_k_extended = (top_k * 3) as i64;
         let graph = self.connect().await?;
         let q = query(
-            &format!(
-                r#"
-                MATCH (e:Embedding) 
-                WHERE e.partition = $partition AND e.instance = $instance
-                WITH e, algo.similarity.cosine(e.embedding, $embedding) 
-                AS similarity 
-                RETURN id(e) AS id, e.model AS model, e.embedding AS embedding, 
-                       e.partition AS partition, e.instance AS instance, similarity
-                ORDER BY similarity DESC LIMIT {}
+            r#"
+                CALL db.index.vector.queryNodes(
+                    'embeddingEmbeddings',
+                    $topKExtended,
+                    $embedding
+                ) YIELD node, score
+                WITH node, score
+                WHERE node.partition = $partition
+                  AND node.instance = $instance
+                RETURN node.partition AS partition,
+                       node.instance AS instance,
+                       node.embedding AS embedding,
+                       node.model AS model,
+                       id(node) AS id,
+                       score
+                ORDER BY score DESC
                 "#,
-                top_k
-            )
         )
         .param("embedding", embedding)
+        .param("topKExtended", top_k_extended)
         .param("partition", partition)
         .param("instance", instance);
 
-        let mut result = graph.execute(q).await?;
+        let result = graph.execute(q).await;
+
+        let mut result = match result {
+            Ok(r) => r,
+            Err(e) => {
+                error!("Error executing query: {}", e);
+                return Err(Error::msg(format!("Error executing query: {}", e)));
+            }
+        };
+        info!("Query executed successfully");
 
         let mut similar_embeddings = Vec::new();
         while let Some(row) = result.next().await? {
             let id = row.get::<i64>("id")?.to_string();
             let model = row.get::<String>("model")?;
-            let embedding_vec = row.get::<Vec<f32>>("embedding")?;
-            let similarity = row.get::<f64>("similarity")?;
-            
+
             let node = EmbeddingNode {
                 id: Some(id),
                 model,
-                embedding: embedding_vec,
+                embedding: vec![],
                 partition: Some(partition.to_string()),
                 instance: Some(instance.to_string()),
             };
-            
+
             similar_embeddings.push(node);
         }
 

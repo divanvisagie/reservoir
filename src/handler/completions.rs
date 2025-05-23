@@ -6,9 +6,13 @@ use crate::clients::openai::types::{
     enrich_chat_request, ChatRequest, ChatResponse, Choice, Message,
 };
 use crate::models::message_node::MessageNode;
-use crate::repos::message::Neo4jMessageRepository;
+use crate::repos::embedding::{AnyEmbeddingRepository, Neo4jEmbeddingRepository};
+use crate::repos::message::{AnyMessageRepository, Neo4jMessageRepository};
 use crate::services::ChatRequestService;
-use crate::utils::{count_single_message_tokens, deduplicate_message_nodes, get_last_message_in_chat_request, truncate_messages_if_needed};
+use crate::utils::{
+    count_single_message_tokens, deduplicate_message_nodes, get_last_message_in_chat_request,
+    truncate_messages_if_needed,
+};
 use crate::{
     clients::openai::embeddings::get_embeddings_for_text, repos::message::MessageRepository,
 };
@@ -19,8 +23,6 @@ use tracing::{error, info};
 
 const SIMILAR_MESSAGES_LIMIT: usize = 7;
 const LAST_MESSAGES_LIMIT: usize = 15;
-
-
 
 pub async fn is_last_message_too_big(last_message: &Message, model: &ModelInfo) -> Option<Bytes> {
     let input_token_limit = model.input_tokens;
@@ -75,8 +77,9 @@ pub async fn handle_with_partition(
     let model = ModelInfo::new(chat_request_model.model.clone());
 
     let trace_id = Uuid::new_v4().to_string();
-    let message_repo = Neo4jMessageRepository::default();
-    let service = ChatRequestService::new(&message_repo);
+    let message_repo = AnyMessageRepository::new_neo4j();
+    let embeddings_repo = AnyEmbeddingRepository::new_neo4j();
+    let service = ChatRequestService::new(&message_repo, &embeddings_repo);
 
     let last_message = chat_request_model
         .messages
@@ -100,24 +103,27 @@ pub async fn handle_with_partition(
         .clone();
 
     let mut similar = if !embeddings.is_empty() {
-        service.find_similar_messages(
-            embeddings,
-            trace_id.as_str(),
-            partition,
-            instance,
-            SIMILAR_MESSAGES_LIMIT,
-        )
-        .await
-        .unwrap_or_else(|e| {
-            error!("Error finding similar messages: {}", e);
-            Vec::new()
-        })
+        service
+            .find_similar_messages(
+                embeddings,
+                trace_id.as_str(),
+                partition,
+                instance,
+                SIMILAR_MESSAGES_LIMIT,
+            )
+            .await
+            .unwrap_or_else(|e| {
+                error!("Error finding similar messages: {}", e);
+                Vec::new()
+            })
     } else {
         Vec::new()
     };
     similar = deduplicate_message_nodes(similar);
 
-    let similar_pairs = message_repo.find_connections_between_nodes(&similar).await?;
+    let similar_pairs = message_repo
+        .find_connections_between_nodes(&similar)
+        .await?;
     similar.extend(similar_pairs);
     let first = similar.first().clone();
     let similar = match first {
@@ -143,9 +149,10 @@ pub async fn handle_with_partition(
         .await
         .unwrap_or_else(|e| {
             error!("Error finding last messages: {}", e);
-            Vec::new() 
+            Vec::new()
         });
-    service.save_chat_request(&chat_request_model, trace_id.as_str(), partition, instance)
+    service
+        .save_chat_request(&chat_request_model, trace_id.as_str(), partition, instance)
         .await
         .expect("Could not save the request");
 
@@ -171,11 +178,13 @@ pub async fn handle_with_partition(
         instance,
         embedding,
     );
-    message_repo.save_message_node(&message_node)
+    message_repo
+        .save_message_node(&message_node)
         .await
         .expect("Failed to save message node");
 
-    message_repo.connect_synapses()
+    message_repo
+        .connect_synapses()
         .await
         .expect("Failed to connect synapses");
 
