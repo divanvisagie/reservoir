@@ -58,23 +58,48 @@ impl<'a> ChatRequestService<'a> {
             .find_similar_embeddings(embedding.clone(), partition, instance, top_k)
             .await;
 
-        match embedding_result {
+        let embedding_result = match embedding_result {
             Ok(embeddings) => {
                 if embeddings.is_empty() {
                     info!("No similar embeddings found");
                     return Ok(vec![]);
                 }
                 info!("Found similar embeddings: {:?}", embeddings);
+                embeddings
             }
             Err(e) => {
                 info!("Error finding similar embeddings: {}", e);
                 return Err(e);
             }
-        }
+        };
 
-        self.message_repo
-            .find_similar_messages(embedding, trace_id, partition, instance, top_k)
-            .await
+        let node_ids: Vec<i64> = embedding_result.iter().filter_map(|e| e.id).collect();
+        let s_m = self
+            .message_repo
+            .get_messages_for_embedding_nodes(node_ids)
+            .await;
+        s_m
+
+        // let sm = match s_m {
+        //     Ok(messages) => {
+        //         if messages.is_empty() {
+        //             info!("No similar messages found");
+        //             return Ok(vec![]);
+        //         }
+        //         info!("Found similar messages: {:?}", messages);
+        //         messages
+        //     }
+        //     Err(e) => {
+        //         info!("Error finding similar messages: {}", e);
+        //         return Err(e);
+        //     }
+        // };
+        //
+        // sm
+
+        // self.message_repo
+        //     .find_similar_messages(embedding, trace_id, partition, instance, top_k)
+        //     .await
     }
 
     pub(crate) async fn find_connections_between_nodes(

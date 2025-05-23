@@ -93,7 +93,7 @@ impl Neo4jEmbeddingRepository {
         let mut result = graph.execute(q).await?;
 
         if let Some(row) = result.next().await? {
-            let id = row.get::<i64>("id")?.to_string();
+            let id = row.get::<i64>("id")?;
             let model = row.get::<String>("model")?;
             let embedding = row.get::<Vec<f32>>("embedding")?;
             let partition = row.get::<String>("partition").ok();
@@ -159,7 +159,7 @@ impl EmbeddingRepository for Neo4jEmbeddingRepository {
 
         let mut similar_embeddings = Vec::new();
         while let Some(row) = result.next().await? {
-            let id = row.get::<i64>("id")?.to_string();
+            let id = row.get::<i64>("id")?;
             let model = row.get::<String>("model")?;
 
             let node = EmbeddingNode {

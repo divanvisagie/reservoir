@@ -584,7 +584,7 @@ impl MessageRepository for Neo4jMessageRepository {
             r#"
             MATCH (e:Embedding)-[:HAS_EMBEDDING]-(m:MessageNode)
             WHERE id(e) IN $embedding_nodes
-            RETURN e
+            RETURN m
             "#,
         )
         .param("embedding_nodes", embedding_nodes);
@@ -592,7 +592,7 @@ impl MessageRepository for Neo4jMessageRepository {
         let mut result = graph.execute(q).await?;
         let mut messages = Vec::new();
         while let Some(row) = result.next().await? {
-            let node: MessageNode = row.get("e")?;
+            let node: MessageNode = row.get("m")?;
             messages.push(node);
         }
         Ok(messages)
