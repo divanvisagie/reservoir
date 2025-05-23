@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::models::embedding_node::EmbeddingNode;
 use crate::models::message_node::MessageNode;
 use crate::repos::config::{get_neo4j_password, get_neo4j_uri, get_neo4j_user};
 use anyhow::Error;
@@ -19,6 +20,12 @@ pub trait MessageRepository {
 
     #[allow(dead_code)]
     async fn get_message_node(&self, trace_id: &str) -> Result<MessageNode, Error>;
+
+    #[allow(dead_code)]
+    async fn get_message_node_by_embedding_id(
+        &self,
+        embedding_id: &str,
+    ) -> Result<MessageNode, Error>;
 
     #[allow(dead_code)]
     async fn get_messages_for_partition(
@@ -85,6 +92,17 @@ impl MessageRepository for AnyMessageRepository {
         }
     }
 
+    async fn get_message_node_by_embedding_id(
+        &self,
+        embedding_id: &str,
+    ) -> Result<MessageNode, Error> {
+        match self {
+            AnyMessageRepository::Neo4j(repo) => {
+                repo.get_message_node_by_embedding_id(embedding_id).await
+            }
+        }
+    }
+
     async fn get_messages_for_partition(
         &self,
         partition: Option<&str>,
@@ -137,13 +155,12 @@ impl MessageRepository for AnyMessageRepository {
             AnyMessageRepository::Neo4j(repo) => repo.connect_synapses().await,
         }
     }
-
 }
 
 pub struct Neo4jMessageRepository {
-    uri: String,
-    user: String,
-    pass: String,
+    pub uri: String,
+    pub user: String,
+    pub pass: String,
 }
 
 impl Neo4jMessageRepository {
@@ -159,7 +176,7 @@ impl Neo4jMessageRepository {
 
     pub async fn init_vector_index(&self) -> Result<(), Error> {
         let index_name = "messageEmbeddings";
-        let emneddings_index_name = "messageEmbeddings";
+        let emneddings_index_name = "embeddingEmbeddings";
         let graph = self.connect().await?;
         // Check if index already exists
         let check_query = query("SHOW INDEXES YIELD name RETURN name");
@@ -183,8 +200,8 @@ impl Neo4jMessageRepository {
                 'cosine'
             );
             CALL db.index.vector.createNodeIndex(
-                '{}_embedding',
-                'EmbeddingNode',
+                '{}',
+                'Embedding',
                 'embedding',
                 1536,
                 'cosine'
@@ -225,6 +242,36 @@ impl Neo4jMessageRepository {
 }
 
 impl MessageRepository for Neo4jMessageRepository {
+    async fn get_message_node_by_embedding_id(
+        &self,
+        embedding_id: &str,
+    ) -> Result<MessageNode, Error> {
+        let graph = self.connect().await?;
+
+        // Query to find the MessageNode connected to an embedding with the given ID
+        let q = query(
+            r#"
+            MATCH (m:MessageNode)-[:HAS_EMBEDDING]->(e:Embedding)
+            WHERE id(e) = toInteger($embedding_id)
+            RETURN m
+            "#,
+        )
+        .param("embedding_id", embedding_id);
+
+        let mut result = graph.execute(q).await?;
+
+        match result.next().await? {
+            Some(row) => {
+                let node: MessageNode = row.get("m")?;
+                Ok(node)
+            }
+            None => Err(Error::msg(format!(
+                "No message found for embedding ID {}",
+                embedding_id
+            ))),
+        }
+    }
+
     async fn save_message_node(&self, message_node: &MessageNode) -> Result<(), Error> {
         // Skip saving system messages
         if message_node.role.eq_ignore_ascii_case("system") {
@@ -244,13 +291,15 @@ impl MessageRepository for Neo4jMessageRepository {
                 embedding: $embedding,
                 url: $url
             })
-            CREATE (e:EmbeddingNode {
+            CREATE (e:Embedding {
                 model: 'text-embedding-ada-002',
-                embedding: $embedding
+                embedding: $embedding,
+                partition: $partition,
+                instance: $instance
             })
             CREATE (m)-[:HAS_EMBEDDING]->(e)
-            RETURN id(m) AS nodeId, id(e) AS embeddingNodeId
-            "#
+            RETURN id(m) AS nodeId, id(e) AS embeddingId
+            "#,
         )
         .param("trace_id", message_node.trace_id.clone())
         .param("content", message_node.content.clone())

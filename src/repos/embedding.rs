@@ -13,6 +13,8 @@ pub trait EmbeddingRepository {
         instance: &str,
         top_k: usize,
     ) -> Result<Vec<EmbeddingNode>, Error>;
+    
+    async fn get_embedding_node(&self, id: &str) -> Result<EmbeddingNode, Error>;
 }
 
 pub enum AnyEmbeddingRepository {
@@ -22,6 +24,10 @@ pub enum AnyEmbeddingRepository {
 impl AnyEmbeddingRepository {
     pub fn new_neo4j(uri: String, user: String, pass: String) -> Self {
         AnyEmbeddingRepository::Neo4j(Neo4jEmbeddingRepository::new(uri, user, pass))
+    }
+    
+    pub fn clone_from_neo4j(repo: &Neo4jEmbeddingRepository) -> Self {
+        AnyEmbeddingRepository::Neo4j(repo.clone())
     }
 }
 
@@ -40,12 +46,30 @@ impl EmbeddingRepository for AnyEmbeddingRepository {
             }
         }
     }
+    
+    async fn get_embedding_node(&self, id: &str) -> Result<EmbeddingNode, Error> {
+        match self {
+            AnyEmbeddingRepository::Neo4j(repo) => {
+                repo.get_embedding_node(id).await
+            }
+        }
+    }
 }
 
 pub struct Neo4jEmbeddingRepository {
     uri: String,
     user: String,
     pass: String,
+}
+
+impl Clone for Neo4jEmbeddingRepository {
+    fn clone(&self) -> Self {
+        Neo4jEmbeddingRepository {
+            uri: self.uri.clone(),
+            user: self.user.clone(),
+            pass: self.pass.clone(),
+        }
+    }
 }
 
 impl Neo4jEmbeddingRepository {
@@ -66,9 +90,47 @@ impl Neo4jEmbeddingRepository {
         let graph = Graph::connect(config).await?;
         Ok(graph)
     }
+    
+    async fn get_embedding_node(&self, id: &str) -> Result<EmbeddingNode, Error> {
+        let graph = self.connect().await?;
+        let q = query(
+            r#"
+            MATCH (e:Embedding) 
+            WHERE id(e) = toInteger($id)
+            RETURN id(e) AS id, e.model AS model, e.embedding AS embedding, 
+                   e.partition AS partition, e.instance AS instance
+            "#
+        )
+        .param("id", id);
+
+        let mut result = graph.execute(q).await?;
+        
+        if let Some(row) = result.next().await? {
+            let id = row.get::<i64>("id")?.to_string();
+            let model = row.get::<String>("model")?;
+            let embedding = row.get::<Vec<f32>>("embedding")?;
+            let partition = row.get::<String>("partition").ok();
+            let instance = row.get::<String>("instance").ok();
+            
+            Ok(EmbeddingNode {
+                id: Some(id),
+                model,
+                embedding,
+                partition,
+                instance,
+            })
+        } else {
+            Err(Error::msg(format!("No embedding found with id {}", id)))
+        }
+    }
 }
 
 impl EmbeddingRepository for Neo4jEmbeddingRepository {
+    async fn get_embedding_node(&self, id: &str) -> Result<EmbeddingNode, Error> {
+        // Call the instance method with the same name
+        Neo4jEmbeddingRepository::get_embedding_node(self, id).await
+    }
+    
     async fn find_similar_embeddings(
         &self,
         embedding: Vec<f32>,
@@ -78,13 +140,18 @@ impl EmbeddingRepository for Neo4jEmbeddingRepository {
     ) -> Result<Vec<EmbeddingNode>, Error> {
         let graph = self.connect().await?;
         let q = query(
-            r#"
-            MATCH (e:EmbeddingNode) 
-            WHERE e.partition = $partition AND e.instance = $instance
-            WITH e, algo.similarity.cosine(e.embedding, $embedding) 
-            AS similarity 
-            RETURN e ORDER BY similarity DESC LIMIT {}
-            "#,
+            &format!(
+                r#"
+                MATCH (e:Embedding) 
+                WHERE e.partition = $partition AND e.instance = $instance
+                WITH e, algo.similarity.cosine(e.embedding, $embedding) 
+                AS similarity 
+                RETURN id(e) AS id, e.model AS model, e.embedding AS embedding, 
+                       e.partition AS partition, e.instance AS instance, similarity
+                ORDER BY similarity DESC LIMIT {}
+                "#,
+                top_k
+            )
         )
         .param("embedding", embedding)
         .param("partition", partition)
@@ -94,7 +161,19 @@ impl EmbeddingRepository for Neo4jEmbeddingRepository {
 
         let mut similar_embeddings = Vec::new();
         while let Some(row) = result.next().await? {
-            let node: EmbeddingNode = row.get("e")?;
+            let id = row.get::<i64>("id")?.to_string();
+            let model = row.get::<String>("model")?;
+            let embedding_vec = row.get::<Vec<f32>>("embedding")?;
+            let similarity = row.get::<f64>("similarity")?;
+            
+            let node = EmbeddingNode {
+                id: Some(id),
+                model,
+                embedding: embedding_vec,
+                partition: Some(partition.to_string()),
+                instance: Some(instance.to_string()),
+            };
+            
             similar_embeddings.push(node);
         }
 
