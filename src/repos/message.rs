@@ -15,6 +15,11 @@ pub trait MessageRepository {
         top_k: usize,
     ) -> Result<Vec<MessageNode>, Error>;
 
+    async fn get_messages_for_embedding_nodes(
+        &self,
+        embedding_nodes: Vec<i64>,
+    ) -> Result<Vec<MessageNode>, Error>;
+
     #[allow(dead_code)]
     async fn get_message_node(&self, trace_id: &str) -> Result<MessageNode, Error>;
 
@@ -151,6 +156,17 @@ impl MessageRepository for AnyMessageRepository {
             AnyMessageRepository::Neo4j(repo) => repo.connect_synapses().await,
         }
     }
+
+    async fn get_messages_for_embedding_nodes(
+        &self,
+        embedding_nodes: Vec<i64>,
+    ) -> Result<Vec<MessageNode>, Error> {
+        match self {
+            AnyMessageRepository::Neo4j(repo) => {
+                repo.get_messages_for_embedding_nodes(embedding_nodes).await
+            }
+        }
+    }
 }
 
 pub struct Neo4jMessageRepository {
@@ -238,36 +254,6 @@ impl Neo4jMessageRepository {
 }
 
 impl MessageRepository for Neo4jMessageRepository {
-    async fn get_message_node_by_embedding_id(
-        &self,
-        embedding_id: &str,
-    ) -> Result<MessageNode, Error> {
-        let graph = self.connect().await?;
-
-        // Query to find the MessageNode connected to an embedding with the given ID
-        let q = query(
-            r#"
-            MATCH (m:MessageNode)-[:HAS_EMBEDDING]->(e:Embedding)
-            WHERE id(e) = toInteger($embedding_id)
-            RETURN m
-            "#,
-        )
-        .param("embedding_id", embedding_id);
-
-        let mut result = graph.execute(q).await?;
-
-        match result.next().await? {
-            Some(row) => {
-                let node: MessageNode = row.get("m")?;
-                Ok(node)
-            }
-            None => Err(Error::msg(format!(
-                "No message found for embedding ID {}",
-                embedding_id
-            ))),
-        }
-    }
-
     async fn save_message_node(&self, message_node: &MessageNode) -> Result<(), Error> {
         // Skip saving system messages
         if message_node.role.eq_ignore_ascii_case("system") {
@@ -328,55 +314,6 @@ impl MessageRepository for Neo4jMessageRepository {
         }
 
         Ok(())
-    }
-
-    async fn get_message_node(&self, trace_id: &str) -> Result<MessageNode, Error> {
-        let graph = self.connect().await?;
-        let q = format!(
-            "MATCH (m:MessageNode {{trace_id: '{}'}}) RETURN m",
-            trace_id
-        );
-        let mut result = graph.execute(query(q.as_str())).await?;
-        if let Some(row) = result.next().await? {
-            let node: MessageNode = row.get("m")?;
-            Ok(node)
-        } else {
-            Err(Error::msg("MessageNode not found"))
-        }
-    }
-
-    async fn get_messages_for_partition(
-        &self,
-        partition: Option<&str>,
-    ) -> Result<Vec<MessageNode>, Error> {
-        let graph = self.connect().await?;
-        let q = if let Some(p) = partition {
-            query("MATCH (m:MessageNode {partition: $partition}) RETURN m").param("partition", p)
-        } else {
-            query("MATCH (m:MessageNode) RETURN m")
-        };
-
-        let mut result = graph.execute(q).await?;
-        let mut messages = Vec::new();
-
-        while let Some(row) = result.next().await? {
-            let node: MessageNode = row.get("m")?;
-            messages.push(node);
-        }
-
-        Ok(messages)
-    }
-
-    async fn delete_message_node(&self, trace_id: &str) -> Result<i32, Error> {
-        let graph = self.connect().await?;
-        let q = format!(
-            "MATCH (m:MessageNode {{trace_id: '{}'}}) DELETE m RETURN COUNT(m)",
-            trace_id
-        );
-        let mut result = graph.execute(query(q.as_str())).await?;
-        let row = result.next().await.unwrap().unwrap();
-        let count: i32 = row.get("COUNT(m)")?;
-        Ok(count)
     }
 
     async fn find_similar_messages(
@@ -445,6 +382,73 @@ impl MessageRepository for Neo4jMessageRepository {
         Ok(messages)
     }
 
+    async fn get_message_node(&self, trace_id: &str) -> Result<MessageNode, Error> {
+        let graph = self.connect().await?;
+        let q = format!(
+            "MATCH (m:MessageNode {{trace_id: '{}'}}) RETURN m",
+            trace_id
+        );
+        let mut result = graph.execute(query(q.as_str())).await?;
+        if let Some(row) = result.next().await? {
+            let node: MessageNode = row.get("m")?;
+            Ok(node)
+        } else {
+            Err(Error::msg("MessageNode not found"))
+        }
+    }
+
+    async fn get_message_node_by_embedding_id(
+        &self,
+        embedding_id: &str,
+    ) -> Result<MessageNode, Error> {
+        let graph = self.connect().await?;
+
+        // Query to find the MessageNode connected to an embedding with the given ID
+        let q = query(
+            r#"
+            MATCH (m:MessageNode)-[:HAS_EMBEDDING]->(e:Embedding)
+            WHERE id(e) = toInteger($embedding_id)
+            RETURN m
+            "#,
+        )
+        .param("embedding_id", embedding_id);
+
+        let mut result = graph.execute(q).await?;
+
+        match result.next().await? {
+            Some(row) => {
+                let node: MessageNode = row.get("m")?;
+                Ok(node)
+            }
+            None => Err(Error::msg(format!(
+                "No message found for embedding ID {}",
+                embedding_id
+            ))),
+        }
+    }
+
+    async fn get_messages_for_partition(
+        &self,
+        partition: Option<&str>,
+    ) -> Result<Vec<MessageNode>, Error> {
+        let graph = self.connect().await?;
+        let q = if let Some(p) = partition {
+            query("MATCH (m:MessageNode {partition: $partition}) RETURN m").param("partition", p)
+        } else {
+            query("MATCH (m:MessageNode) RETURN m")
+        };
+
+        let mut result = graph.execute(q).await?;
+        let mut messages = Vec::new();
+
+        while let Some(row) = result.next().await? {
+            let node: MessageNode = row.get("m")?;
+            messages.push(node);
+        }
+
+        Ok(messages)
+    }
+
     async fn get_last_messages_for_partition_and_instance(
         &self,
         partition: String,
@@ -463,6 +467,18 @@ impl MessageRepository for Neo4jMessageRepository {
             messages.push(node);
         }
         Ok(messages)
+    }
+
+    async fn delete_message_node(&self, trace_id: &str) -> Result<i32, Error> {
+        let graph = self.connect().await?;
+        let q = format!(
+            "MATCH (m:MessageNode {{trace_id: '{}'}}) DELETE m RETURN COUNT(m)",
+            trace_id
+        );
+        let mut result = graph.execute(query(q.as_str())).await?;
+        let row = result.next().await.unwrap().unwrap();
+        let count: i32 = row.get("COUNT(m)")?;
+        Ok(count)
     }
 
     async fn find_connections_between_nodes(
@@ -505,6 +521,29 @@ impl MessageRepository for Neo4jMessageRepository {
         Ok(connected_nodes) // Return the vector of MessageNode
     }
 
+    /// Finds nodes connected to a given node within a distance of 10 hops.
+    /// Returns a vector of `MessageNode` instances representing the connected nodes.
+    /// The distance is defined by the number of hops in the graph.
+    async fn find_nodes_connected_to_node(
+        &self,
+        node: &MessageNode,
+    ) -> Result<Vec<MessageNode>, Error> {
+        let graph = self.connect().await?;
+        let q = r#"
+            MATCH p=(m:MessageNode {trace_id: $trace_id})-[:SYNAPSE*1..10]-(n:MessageNode)
+            RETURN nodes(p) AS allNodes
+        "#;
+        let mut result = graph
+            .execute(query(q).param("trace_id", node.trace_id.clone()))
+            .await?;
+        let mut connected_nodes = Vec::new();
+        while let Ok(Some(row)) = result.next().await {
+            let nodes: Vec<MessageNode> = row.get("allNodes")?;
+            connected_nodes.extend(nodes);
+        }
+        Ok(connected_nodes)
+    }
+
     async fn connect_synapses(&self) -> Result<(), Error> {
         let graph = self.connect().await?;
         let q = r#"
@@ -536,27 +575,27 @@ impl MessageRepository for Neo4jMessageRepository {
         Ok(())
     }
 
-    /// Finds nodes connected to a given node within a distance of 10 hops.
-    /// Returns a vector of `MessageNode` instances representing the connected nodes.
-    /// The distance is defined by the number of hops in the graph.
-    async fn find_nodes_connected_to_node(
+    async fn get_messages_for_embedding_nodes(
         &self,
-        node: &MessageNode,
+        embedding_nodes: Vec<i64>,
     ) -> Result<Vec<MessageNode>, Error> {
         let graph = self.connect().await?;
-        let q = r#"
-            MATCH p=(m:MessageNode {trace_id: $trace_id})-[:SYNAPSE*1..10]-(n:MessageNode)
-            RETURN nodes(p) AS allNodes
-        "#;
-        let mut result = graph
-            .execute(query(q).param("trace_id", node.trace_id.clone()))
-            .await?;
-        let mut connected_nodes = Vec::new();
-        while let Ok(Some(row)) = result.next().await {
-            let nodes: Vec<MessageNode> = row.get("allNodes")?;
-            connected_nodes.extend(nodes);
+        let q = query(
+            r#"
+            MATCH (e:Embedding)-[:HAS_EMBEDDING]-(m:MessageNode)
+            WHERE id(e) IN $embedding_nodes
+            RETURN e
+            "#,
+        )
+        .param("embedding_nodes", embedding_nodes);
+
+        let mut result = graph.execute(q).await?;
+        let mut messages = Vec::new();
+        while let Some(row) = result.next().await? {
+            let node: MessageNode = row.get("e")?;
+            messages.push(node);
         }
-        Ok(connected_nodes)
+        Ok(messages)
     }
 }
 
