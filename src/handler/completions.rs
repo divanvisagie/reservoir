@@ -149,8 +149,15 @@ pub async fn handle_with_partition(
             error!("Error finding last messages: {}", e);
             Vec::new()
         });
+    let embedding_client = EmbeddingClient::with_fastembed("bge-large-en-v15");
     service
-        .save_chat_request(&chat_request_model, trace_id.as_str(), partition, instance)
+        .save_chat_request(
+            &chat_request_model,
+            &embedding_client.clone(),
+            trace_id.as_str(),
+            partition,
+            instance,
+        )
         .await
         .expect("Could not save the request");
 
@@ -161,14 +168,8 @@ pub async fn handle_with_partition(
     let chat_response = get_completion_message(&model, &enriched_chat_request)
         .await
         .expect("Failed to get completion message");
-
     let message_node = chat_response.choices.first().unwrap().message.clone();
-    let embedding = get_embeddings_for_text(message_node.content.as_str())
-        .await?
-        .first()
-        .unwrap()
-        .embedding
-        .clone();
+    let embedding = get_embeddings_for_txt(message_node.content.as_str(), embedding_client).await?;
     let message_node = MessageNode::from_message(
         &message_node,
         trace_id.as_str(),

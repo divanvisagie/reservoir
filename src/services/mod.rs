@@ -1,4 +1,4 @@
-use crate::clients::embedding::EmbeddingClient;
+use crate::clients::embedding::{get_embeddings_for_txt, EmbeddingClient};
 use crate::repos::embedding::{AnyEmbeddingRepository, EmbeddingRepository};
 
 use crate::repos::message::AnyMessageRepository;
@@ -30,17 +30,15 @@ impl<'a> ChatRequestService<'a> {
     pub async fn save_chat_request(
         &self,
         chat_request: &ChatRequest,
+        embedding_client: &EmbeddingClient,
         trace_id: &str,
         partition: &str,
         instance: &str,
     ) -> Result<(), Error> {
         for message in &chat_request.messages {
-            let embedding = get_embeddings_for_text(message.content.as_str())
-                .await?
-                .first()
-                .unwrap()
-                .embedding
-                .clone();
+            let embedding =
+                get_embeddings_for_txt(message.content.as_str(), embedding_client.to_owned())
+                    .await?;
             let node = MessageNode::from_message(message, trace_id, partition, instance, embedding);
             self.message_repo.save_message_node(&node).await?;
         }
