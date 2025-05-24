@@ -145,4 +145,8 @@ impl<'a> ChatRequestService<'a> {
             .attach_embedding_to_message(message, embedding, embedding_client, model)
             .await
     }
+
+    pub(crate) async fn get_messages(&self) -> Result<Vec<MessageNode>, Error> {
+        self.message_repo.get_messages().await
+    }
 }

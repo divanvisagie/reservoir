@@ -8,7 +8,8 @@ use crate::{
 };
 
 pub async fn execute<'a>(service: &'a ChatRequestService<'a>, model: &str) -> Result<(), Error> {
-    let messages = service.get_messages_for_partition("default").await?;
+    let messages = service.get_messages().await?;
+    info!("Found {} messages to process", messages.len());
 
     // Spawn tasks for each message
     for message in messages {

@@ -53,6 +53,7 @@ pub trait MessageRepository {
         node: &MessageNode,
     ) -> Result<Vec<MessageNode>, Error>; // Changed return type
     async fn connect_synapses(&self) -> Result<(), Error>;
+    async fn get_messages(&self) -> Result<Vec<MessageNode>, Error>;
 }
 
 pub enum AnyMessageRepository {
@@ -168,6 +169,12 @@ impl MessageRepository for AnyMessageRepository {
                 repo.get_messages_for_embedding_nodes(embedding_nodes, embedding_client)
                     .await
             }
+        }
+    }
+
+    async fn get_messages(&self) -> Result<Vec<MessageNode>, Error> {
+        match self {
+            AnyMessageRepository::Neo4j(repo) => repo.get_messages().await,
         }
     }
 }

@@ -95,6 +95,20 @@ impl Neo4jMessageRepository {
 }
 
 impl MessageRepository for Neo4jMessageRepository {
+    async fn get_messages(&self) -> Result<Vec<MessageNode>, Error> {
+        let graph = self.connect().await?;
+        let q = "MATCH (m:MessageNode) RETURN m, id(m) as id";
+        let mut result = graph.execute(query(q)).await?;
+        let mut messages = Vec::new();
+        while let Some(row) = result.next().await? {
+            // First, extract the MessageNode
+            let mut node: MessageNode = row.get("m")?;
+            // Then, override its id field with the database id
+            node.id = Some(row.get::<i64>("id")?);
+            messages.push(node);
+        }
+        Ok(messages)
+    }
     async fn save_message_node(&self, message_node: &MessageNode) -> Result<(), Error> {
         // Skip saving system messages
         if message_node.role.eq_ignore_ascii_case("system") {
