@@ -1,3 +1,4 @@
+use crate::clients::embedding::{get_embeddings_for_txt, EmbeddingClient};
 use crate::clients::openai::embeddings::get_embeddings_for_text;
 use crate::clients::openai::types::Message;
 use crate::services::ChatRequestService;
@@ -75,13 +76,17 @@ pub async fn execute<'a>(
     deduplicate: bool,
 ) -> Result<Vec<Message>, Error> {
     if semantic {
-        let embeddings = get_embeddings_for_text(&term).await?;
-        let embedding = embeddings
-            .first()
-            .map(|e| e.embedding.clone())
-            .unwrap_or_default();
+        let client = EmbeddingClient::with_fastembed("bge-large-env15");
+        let embedding = get_embeddings_for_txt(&term, client.clone()).await?;
         let mut similar = service
-            .find_similar_messages(embedding, "search-trace-id", &partition, &instance, count)
+            .find_similar_messages(
+                embedding,
+                &client,
+                "search-trace-id",
+                &partition,
+                &instance,
+                count,
+            )
             .await?;
         if deduplicate {
             similar = deduplicate_message_nodes(similar);

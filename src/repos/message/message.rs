@@ -1,4 +1,4 @@
-use crate::models::message_node::MessageNode;
+use crate::{clients::embedding::EmbeddingClient, models::message_node::MessageNode};
 use anyhow::Error;
 use neo4rs::*;
 
@@ -18,6 +18,7 @@ pub trait MessageRepository {
     async fn get_messages_for_embedding_nodes(
         &self,
         embedding_nodes: Vec<i64>,
+        embedding_client: &EmbeddingClient,
     ) -> Result<Vec<MessageNode>, Error>;
 
     #[allow(dead_code)]
@@ -160,10 +161,12 @@ impl MessageRepository for AnyMessageRepository {
     async fn get_messages_for_embedding_nodes(
         &self,
         embedding_nodes: Vec<i64>,
+        embedding_client: &EmbeddingClient,
     ) -> Result<Vec<MessageNode>, Error> {
         match self {
             AnyMessageRepository::Neo4j(repo) => {
-                repo.get_messages_for_embedding_nodes(embedding_nodes).await
+                repo.get_messages_for_embedding_nodes(embedding_nodes, embedding_client)
+                    .await
             }
         }
     }

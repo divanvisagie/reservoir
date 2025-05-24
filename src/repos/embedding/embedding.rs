@@ -3,6 +3,7 @@ use neo4rs::{query, ConfigBuilder, Graph};
 use tracing::{error, info};
 
 use crate::{
+    clients::embedding::EmbeddingClient,
     models::{embedding_node::EmbeddingNode, message_node::MessageNode},
     repos::config::{get_neo4j_password, get_neo4j_uri, get_neo4j_user},
 };
@@ -11,6 +12,7 @@ pub trait EmbeddingRepository {
     async fn find_similar_embeddings(
         &self,
         embedding: Vec<f32>,
+        embedding_client: &EmbeddingClient,
         partition: &str,
         instance: &str,
         top_k: usize,
@@ -19,6 +21,7 @@ pub trait EmbeddingRepository {
         &self,
         message: &MessageNode,
         embedding: Vec<f32>,
+        embedding_client: &EmbeddingClient,
         model: &str,
     ) -> Result<(), Error>;
 }
@@ -37,14 +40,21 @@ impl EmbeddingRepository for AnyEmbeddingRepository {
     async fn find_similar_embeddings(
         &self,
         embedding: Vec<f32>,
+        embedding_client: &EmbeddingClient,
         partition: &str,
         instance: &str,
         top_k: usize,
     ) -> Result<Vec<EmbeddingNode>, Error> {
         match self {
             AnyEmbeddingRepository::Neo4j(repo) => {
-                repo.find_similar_embeddings(embedding, partition, instance, top_k)
-                    .await
+                repo.find_similar_embeddings(
+                    embedding,
+                    embedding_client,
+                    partition,
+                    instance,
+                    top_k,
+                )
+                .await
             }
         }
     }
@@ -53,11 +63,12 @@ impl EmbeddingRepository for AnyEmbeddingRepository {
         &self,
         message: &MessageNode,
         embedding: Vec<f32>,
+        embedding_client: &EmbeddingClient,
         model: &str,
     ) -> Result<(), Error> {
         match self {
             AnyEmbeddingRepository::Neo4j(repo) => {
-                repo.attach_embedding_to_message(message, embedding, model)
+                repo.attach_embedding_to_message(message, embedding, embedding_client, model)
                     .await
             }
         }
@@ -138,6 +149,7 @@ impl EmbeddingRepository for Neo4jEmbeddingRepository {
         &self,
         message: &MessageNode,
         embedding: Vec<f32>,
+        embedding_client: &EmbeddingClient,
         model: &str,
     ) -> Result<(), Error> {
         let message_id = message.id.unwrap_or_default();
@@ -155,28 +167,30 @@ impl EmbeddingRepository for Neo4jEmbeddingRepository {
         info!("Role: {}", role);
 
         let graph = self.connect().await?;
-        let q = query(
+        let query_string = format!(
             r#"
             MATCH (m:MessageNode)
             WHERE m.trace_id = $trace_id
             AND m.role = $role
-            CREATE (e:Embedding {
+            CREATE (e:{} {{
                 embedding: $embedding,
                 model: $model,
                 partition: $partition,
                 instance: $instance,
                 timestamp: $timestamp
-            })
+            }})
             CREATE (m)-[:HAS_EMBEDDING]->(e)
             "#,
-        )
-        .param("embedding", embedding)
-        .param("timestamp", timestamp)
-        .param("partition", partition)
-        .param("model", model)
-        .param("trace_id", trace_id)
-        .param("role", role)
-        .param("instance", instance);
+            embedding_client.get_node_name()
+        );
+        let q = query(query_string.as_str())
+            .param("embedding", embedding)
+            .param("timestamp", timestamp)
+            .param("partition", partition)
+            .param("model", model)
+            .param("trace_id", trace_id)
+            .param("role", role)
+            .param("instance", instance);
 
         let mut r = graph.execute(q).await?;
         r.next().await?;
@@ -186,16 +200,18 @@ impl EmbeddingRepository for Neo4jEmbeddingRepository {
     async fn find_similar_embeddings(
         &self,
         embedding: Vec<f32>,
+        embedding_client: &EmbeddingClient,
         partition: &str,
         instance: &str,
         top_k: usize,
     ) -> Result<Vec<EmbeddingNode>, Error> {
+        // get value from embeddingClient enum
         let top_k_extended = (top_k * 3) as i64;
         let graph = self.connect().await?;
-        let q = query(
+        let query_string = format!(
             r#"
                 CALL db.index.vector.queryNodes(
-                    'embeddingEmbeddings',
+                    '{}',
                     $topKExtended,
                     $embedding
                 ) YIELD node, score
@@ -210,11 +226,13 @@ impl EmbeddingRepository for Neo4jEmbeddingRepository {
                        score
                 ORDER BY score DESC
                 "#,
-        )
-        .param("embedding", embedding)
-        .param("topKExtended", top_k_extended)
-        .param("partition", partition)
-        .param("instance", instance);
+            embedding_client.get_index_name()
+        );
+        let q = query(query_string.as_str())
+            .param("embedding", embedding)
+            .param("topKExtended", top_k_extended)
+            .param("partition", partition)
+            .param("instance", instance);
 
         let result = graph.execute(q).await;
 

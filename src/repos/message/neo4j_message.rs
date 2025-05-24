@@ -3,6 +3,7 @@ use neo4rs::{query, ConfigBuilder, Graph};
 use tracing::{error, info};
 
 use crate::{
+    clients::embedding::EmbeddingClient,
     models::message_node::MessageNode,
     repos::config::{get_neo4j_password, get_neo4j_uri, get_neo4j_user},
 };
@@ -423,16 +424,18 @@ impl MessageRepository for Neo4jMessageRepository {
     async fn get_messages_for_embedding_nodes(
         &self,
         embedding_nodes: Vec<i64>,
+        embedding_client: &EmbeddingClient,
     ) -> Result<Vec<MessageNode>, Error> {
         let graph = self.connect().await?;
-        let q = query(
+        let query_string = format!(
             r#"
-            MATCH (e:Embedding)-[:HAS_EMBEDDING]-(m:MessageNode)
+            MATCH (e:{})-[:HAS_EMBEDDING]-(m:MessageNode)
             WHERE id(e) IN $embedding_nodes
             RETURN m
             "#,
-        )
-        .param("embedding_nodes", embedding_nodes);
+            embedding_client.get_node_name()
+        );
+        let q = query(query_string.as_str()).param("embedding_nodes", embedding_nodes);
 
         let mut result = graph.execute(q).await?;
         let mut messages = Vec::new();

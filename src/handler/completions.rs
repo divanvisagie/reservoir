@@ -1,5 +1,6 @@
 use anyhow::Error;
 
+use crate::clients::embedding::{get_embeddings_for_txt, EmbeddingClient};
 use crate::clients::openai::chat_completions::get_completion_message;
 use crate::clients::openai::model_info::ModelInfo;
 use crate::clients::openai::types::{
@@ -95,17 +96,14 @@ pub async fn handle_with_partition(
     get_last_message_in_chat_request(&chat_request_model)?;
 
     info!("Using search term: {}", search_term);
-    let embeddings = get_embeddings_for_text(search_term)
-        .await?
-        .first()
-        .unwrap()
-        .embedding
-        .clone();
+    let client = EmbeddingClient::with_fastembed("bge-large-en-v15");
+    let embeddings = get_embeddings_for_txt(search_term, client.clone()).await?;
 
     let mut similar = if !embeddings.is_empty() {
         service
             .find_similar_messages(
-                embeddings,
+                embeddings.clone(),
+                &client,
                 trace_id.as_str(),
                 partition,
                 instance,

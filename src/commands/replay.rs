@@ -16,11 +16,11 @@ pub async fn execute<'a>(service: &'a ChatRequestService<'a>, model: &str) -> Re
         println!("message id : {:?}", message.id);
 
         match message.content.clone() {
-            Some(content) => match get_embeddings_for_txt(content.as_str(), ec).await {
+            Some(content) => match get_embeddings_for_txt(content.as_str(), ec.clone()).await {
                 Ok(embeddings) => {
                     info!("attaching to message: {:?}", message.id);
                     let r = service
-                        .attach_embedding_to_message(&message, embeddings, model)
+                        .attach_embedding_to_message(&message, embeddings, &ec, model)
                         .await;
                     match r {
                         Ok(_) => {

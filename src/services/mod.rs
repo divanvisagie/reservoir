@@ -1,4 +1,6 @@
+use crate::clients::embedding::EmbeddingClient;
 use crate::repos::embedding::{AnyEmbeddingRepository, EmbeddingRepository};
+
 use crate::repos::message::AnyMessageRepository;
 use crate::repos::message::MessageRepository;
 use anyhow::Error;
@@ -48,6 +50,7 @@ impl<'a> ChatRequestService<'a> {
     pub async fn find_similar_messages(
         &self,
         embedding: Vec<f32>,
+        embedding_client: &EmbeddingClient,
         _trace_id: &str,
         partition: &str,
         instance: &str,
@@ -55,7 +58,13 @@ impl<'a> ChatRequestService<'a> {
     ) -> Result<Vec<MessageNode>, Error> {
         let embedding_result = self
             .embeddings_repo
-            .find_similar_embeddings(embedding.clone(), partition, instance, top_k)
+            .find_similar_embeddings(
+                embedding.clone(),
+                embedding_client,
+                partition,
+                instance,
+                top_k,
+            )
             .await;
 
         let embedding_result = match embedding_result {
@@ -76,7 +85,7 @@ impl<'a> ChatRequestService<'a> {
         let node_ids: Vec<i64> = embedding_result.iter().filter_map(|e| e.id).collect();
         let s_m = self
             .message_repo
-            .get_messages_for_embedding_nodes(node_ids)
+            .get_messages_for_embedding_nodes(node_ids, embedding_client)
             .await;
         s_m
 
@@ -131,10 +140,11 @@ impl<'a> ChatRequestService<'a> {
         &self,
         message: &MessageNode,
         embedding: Vec<f32>,
+        embedding_client: &EmbeddingClient,
         model: &str,
     ) -> Result<(), Error> {
         self.embeddings_repo
-            .attach_embedding_to_message(message, embedding, model)
+            .attach_embedding_to_message(message, embedding, embedding_client, model)
             .await
     }
 }

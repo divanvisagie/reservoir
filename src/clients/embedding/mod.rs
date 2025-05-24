@@ -5,23 +5,48 @@ use anyhow::Error;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use tracing::info;
 
+#[derive(Clone, Debug)]
 pub enum EmbeddingClient {
-    OpenAI(String),
-    FastEmbed(String),
+    OpenAI { model: String, length: i32 },
+    FastEmbed { model: String, length: i32 },
 }
 
 #[allow(dead_code)]
 impl EmbeddingClient {
     pub fn new_openai(model: String) -> Self {
-        EmbeddingClient::OpenAI(model)
+        EmbeddingClient::OpenAI {
+            model,
+            length: 1536,
+        }
     }
 
     pub fn with_fastembed(model: &str) -> Self {
-        EmbeddingClient::FastEmbed(model.to_string())
+        EmbeddingClient::FastEmbed {
+            model: model.to_string(),
+            length: 1024,
+        }
     }
 
     pub fn default() -> Self {
-        EmbeddingClient::OpenAI("text-embedding-ada-002".to_string())
+        let model = "text-embedding-ada-002".to_string();
+        EmbeddingClient::OpenAI {
+            model,
+            length: 1536,
+        }
+    }
+
+    pub fn get_node_name(&self) -> String {
+        match self {
+            EmbeddingClient::OpenAI { model, .. } => format!("Embedding1536"),
+            EmbeddingClient::FastEmbed { model, .. } => format!("Embedding1024"),
+        }
+    }
+
+    pub fn get_index_name(&self) -> String {
+        match self {
+            EmbeddingClient::OpenAI { model, .. } => format!("embedding1536"),
+            EmbeddingClient::FastEmbed { model, .. } => format!("embedding1024"),
+        }
     }
 }
 
@@ -35,7 +60,7 @@ pub async fn get_embeddings_for_txt(
     client: EmbeddingClient,
 ) -> Result<Vec<f32>, Error> {
     match client {
-        EmbeddingClient::OpenAI(_model) => {
+        EmbeddingClient::OpenAI { model, length } => {
             let result = openai_get_embeddings_for_text(text).await;
             match result {
                 Ok(embeddings) => {
@@ -48,7 +73,7 @@ pub async fn get_embeddings_for_txt(
                 Err(e) => Err(e),
             }
         }
-        EmbeddingClient::FastEmbed(_model) => {
+        EmbeddingClient::FastEmbed { model, length } => {
             info!("Using FastEmbed for embedding");
             let init_options = InitOptions::new(EmbeddingModel::BGELargeENV15)
                 .with_show_download_progress(true)
