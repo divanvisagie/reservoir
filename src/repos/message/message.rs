@@ -173,6 +173,7 @@ impl MessageRepository for AnyMessageRepository {
 mod tests {
     use super::*;
     use crate::models::message_node::MessageNode;
+    use tracing::error;
 
     #[tokio::test]
     async fn test_save_message_node() {
