@@ -2,9 +2,9 @@ use clap::{command, Parser};
 
 #[derive(Parser, Debug)]
 #[command(
-    author, 
-    version, 
-    about, 
+    author,
+    version,
+    about,
     long_about = r###"
 Reservoir is a transparent proxy for any OpenAI-compatible API. It captures all your AI conversations and stores them in a Neo4j graph, turning every interaction into a searchable, self-growing knowledge base.
 
@@ -17,7 +17,7 @@ Think of it as a personal neural lake that evolves into an intelligent assistant
 )]
 pub struct Args {
     #[command(subcommand)]
-    pub subcmd: Option<SubCommands>
+    pub subcmd: Option<SubCommands>,
 }
 
 #[derive(Parser, Debug)]
@@ -35,12 +35,13 @@ pub enum SubCommands {
     Search(crate::commands::search::SearchSubCommand),
     /// Ingest a message from stdin as a user MessageNode
     Ingest(IngestSubCommand),
+    /// Replay embeddings process
+    Replay(ReplaySubCommand),
 }
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Start the Reservoir proxy", long_about = None)]
 pub struct StartSubCommand {
-
     /// Ollama mode which sets up on same default port as ollama
     /// useful for using as a proxy for clients that don't support
     /// setting a url
@@ -56,7 +57,7 @@ pub struct ConfigSubCommand {
     #[arg(short, long)]
     pub set: Option<String>,
 
-    /// Get your current configuration value. 
+    /// Get your current configuration value.
     /// `cgip config --get model`
     #[arg(short, long)]
     pub get: Option<String>,
@@ -95,3 +96,8 @@ pub struct IngestSubCommand {
     #[arg(long)]
     pub role: Option<String>,
 }
+
+//replay subcommand
+#[derive(Parser, Debug)]
+#[command(author, version, about = "Replay embeddings process", long_about = None)]
+pub struct ReplaySubCommand {}

@@ -38,3 +38,4 @@ url = "2.5.4"
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", features = ["vendored"] }
 fastembed = "4.8.0"
+tokio-stream = "0.1.17"

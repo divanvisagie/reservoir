@@ -11,7 +11,6 @@ use hyper::body::Incoming;
 use hyper::{Method, Request, Response, StatusCode};
 use repos::embedding::AnyEmbeddingRepository;
 use repos::message::AnyMessageRepository;
-use repos::message::Neo4jMessageRepository;
 use services::ChatRequestService;
 use std::convert::Infallible;
 use tracing::{error, info};
@@ -233,6 +232,9 @@ async fn main() -> Result<(), Error> {
         }
         Some(SubCommands::Ingest(ref ingest_cmd)) => {
             commands::ingest::run(&message_repo, ingest_cmd).await?;
+        }
+        Some(SubCommands::Replay(ref _r_cmd)) => {
+            commands::replay::run(&service).await?;
         }
         None => {}
     };

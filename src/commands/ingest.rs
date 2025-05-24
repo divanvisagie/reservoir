@@ -34,7 +34,7 @@ pub async fn run(repo: &AnyMessageRepository, cmd: &IngestSubCommand) -> Result<
         content: content.clone(),
     };
     let client = EmbeddingClient::default();
-    let test_local = EmbeddingClient::new_fastembed("");
+    let test_local = EmbeddingClient::with_fastembed("");
     let embedding = get_embeddings_for_txt(&content, client).await?;
     let embedding_test = get_embeddings_for_txt(&content, test_local).await?;
 

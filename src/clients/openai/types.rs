@@ -2,13 +2,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::message_node::MessageNode;
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Message {
     pub role: String,
     pub content: String,
 }
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ErrorResponse {
@@ -29,9 +27,9 @@ pub struct Usage {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Choice {
-   pub message: Message,
-   pub finish_reason: String,
-   pub index: u64,
+    pub message: Message,
+    pub finish_reason: String,
+    pub index: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -64,7 +62,7 @@ pub fn enrich_chat_request(
     let recent_prompt = r#"The following are the most recent messages in the 
         conversation in chronological order"#;
 
-    last_messages.sort_by(|a, b| a.timestamp.cmp(&b.timestamp)); 
+    last_messages.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
 
     let mut enrichment_block = Vec::new();
 
@@ -141,6 +139,7 @@ mod tests {
     // Helper function to create a dummy MessageNode
     fn create_dummy_node(role: &str, content: &str, timestamp: i64) -> MessageNode {
         MessageNode {
+            id: None,
             trace_id: format!("trace-{}", timestamp),
             partition: "test".to_string(),
             instance: "test_instance".to_string(),
@@ -178,12 +177,21 @@ mod tests {
         let chat_request = enrich_chat_request(similar, last, &mut chat_request);
 
         // Check that both system prompts are present and in correct order
-        let system_prompts: Vec<&str> = chat_request.messages.iter().filter(|m| m.role == "system").map(|m| m.content.trim()).collect();
+        let system_prompts: Vec<&str> = chat_request
+            .messages
+            .iter()
+            .filter(|m| m.role == "system")
+            .map(|m| m.content.trim())
+            .collect();
         assert_eq!(system_prompts[0], "The following is the result of a semantic search \n        of the most related messages by cosine similarity to previous \n        conversations");
         assert_eq!(system_prompts[1], "The following are the most recent messages in the \n        conversation in chronological order");
 
         // Check that all expected user/assistant messages are present
-        let contents: Vec<&str> = chat_request.messages.iter().map(|m| m.content.as_str()).collect();
+        let contents: Vec<&str> = chat_request
+            .messages
+            .iter()
+            .map(|m| m.content.as_str())
+            .collect();
         assert!(contents.contains(&"similar user 1"));
         assert!(contents.contains(&"similar assistant 1"));
         assert!(contents.contains(&"last user 1"));
@@ -209,11 +217,20 @@ mod tests {
         assert_eq!(chat_request.messages[0].role, "system");
         assert_eq!(chat_request.messages[0].content, "initial system prompt");
         // Check that both enrichment system prompts are present
-        let system_prompts: Vec<&str> = chat_request.messages.iter().filter(|m| m.role == "system").map(|m| m.content.trim()).collect();
+        let system_prompts: Vec<&str> = chat_request
+            .messages
+            .iter()
+            .filter(|m| m.role == "system")
+            .map(|m| m.content.trim())
+            .collect();
         assert!(system_prompts.contains(&"The following is the result of a semantic search \n        of the most related messages by cosine similarity to previous \n        conversations"));
         assert!(system_prompts.contains(&"The following are the most recent messages in the \n        conversation in chronological order"));
         // Check that similar and last messages are present
-        let contents: Vec<&str> = chat_request.messages.iter().map(|m| m.content.as_str()).collect();
+        let contents: Vec<&str> = chat_request
+            .messages
+            .iter()
+            .map(|m| m.content.as_str())
+            .collect();
         assert!(contents.contains(&"similar user 1"));
         assert!(contents.contains(&"last user 1"));
         assert!(contents.contains(&"current user message"));
@@ -237,9 +254,16 @@ mod tests {
         let chat_request = enrich_chat_request(similar, last, &mut chat_request);
 
         // Check that deduplication worked: "already exists" from similar should not be present twice
-        let contents: Vec<&str> = chat_request.messages.iter().map(|m| m.content.as_str()).collect();
+        let contents: Vec<&str> = chat_request
+            .messages
+            .iter()
+            .map(|m| m.content.as_str())
+            .collect();
         let count = contents.iter().filter(|&&c| c == "already exists").count();
-        assert_eq!(count, 2, "'already exists' should only appear twice due to current enrichment logic");
+        assert_eq!(
+            count, 2,
+            "'already exists' should only appear twice due to current enrichment logic"
+        );
         assert!(contents.contains(&"new similar"));
         assert!(contents.contains(&"last user 1"));
         assert!(contents.contains(&"current user message"));

@@ -1,3 +1,3 @@
-pub mod message;
-pub mod embedding;
 pub mod config;
+pub mod embedding;
+pub mod message;

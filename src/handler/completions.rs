@@ -6,8 +6,8 @@ use crate::clients::openai::types::{
     enrich_chat_request, ChatRequest, ChatResponse, Choice, Message,
 };
 use crate::models::message_node::MessageNode;
-use crate::repos::embedding::{AnyEmbeddingRepository, Neo4jEmbeddingRepository};
-use crate::repos::message::{AnyMessageRepository, Neo4jMessageRepository};
+use crate::repos::embedding::AnyEmbeddingRepository;
+use crate::repos::message::AnyMessageRepository;
 use crate::services::ChatRequestService;
 use crate::utils::{
     count_single_message_tokens, deduplicate_message_nodes, get_last_message_in_chat_request,

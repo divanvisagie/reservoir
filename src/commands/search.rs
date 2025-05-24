@@ -1,6 +1,5 @@
 use crate::clients::openai::embeddings::get_embeddings_for_text;
 use crate::clients::openai::types::Message;
-use crate::repos::message::{AnyMessageRepository, MessageRepository};
 use crate::services::ChatRequestService;
 use crate::utils::deduplicate_message_nodes;
 use anyhow::Error;
@@ -111,7 +110,7 @@ pub async fn execute<'a>(
             "Keyword search: fetching messages for partition {}",
             partition
         );
-        let messages = service.get_messages_for_partition(Some(&partition)).await?;
+        let messages = service.get_messages_for_partition(&partition).await?;
         let filtered: Vec<Message> = messages
             .iter()
             .filter(|m| {

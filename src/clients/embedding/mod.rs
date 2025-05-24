@@ -10,12 +10,13 @@ pub enum EmbeddingClient {
     FastEmbed(String),
 }
 
+#[allow(dead_code)]
 impl EmbeddingClient {
     pub fn new_openai(model: String) -> Self {
         EmbeddingClient::OpenAI(model)
     }
 
-    pub fn new_fastembed(model: &str) -> Self {
+    pub fn with_fastembed(model: &str) -> Self {
         EmbeddingClient::FastEmbed(model.to_string())
     }
 
@@ -34,7 +35,7 @@ pub async fn get_embeddings_for_txt(
     client: EmbeddingClient,
 ) -> Result<Vec<f32>, Error> {
     match client {
-        EmbeddingClient::OpenAI(model) => {
+        EmbeddingClient::OpenAI(_model) => {
             let result = openai_get_embeddings_for_text(text).await;
             match result {
                 Ok(embeddings) => {

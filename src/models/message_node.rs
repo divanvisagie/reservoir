@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::clients::openai::types::Message;
 
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct MessageNode {
+    pub id: Option<i64>,
     pub trace_id: String,
     pub partition: String,
     pub instance: String,
@@ -26,6 +26,7 @@ impl MessageNode {
         url: Option<String>,
     ) -> Self {
         MessageNode {
+            id: None,
             trace_id,
             partition,
             instance,
@@ -39,6 +40,7 @@ impl MessageNode {
 
     pub fn default() -> Self {
         MessageNode {
+            id: None,
             trace_id: "test-traceid".to_string(),
             partition: "default".to_string(),
             instance: "default".to_string(),
@@ -65,6 +67,7 @@ impl MessageNode {
         embedding: Vec<f32>,
     ) -> Self {
         MessageNode {
+            id: None,
             trace_id: trace_id.to_string(),
             partition: partition.to_string(),
             instance: instance.to_string(),

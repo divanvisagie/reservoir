@@ -2,9 +2,10 @@ use anyhow::Error;
 use neo4rs::{query, ConfigBuilder, Graph};
 use tracing::{error, info};
 
-use crate::models::embedding_node::EmbeddingNode;
-
-use super::config::{get_neo4j_password, get_neo4j_uri, get_neo4j_user};
+use crate::{
+    models::embedding_node::EmbeddingNode,
+    repos::config::{get_neo4j_password, get_neo4j_uri, get_neo4j_user},
+};
 
 pub trait EmbeddingRepository {
     async fn find_similar_embeddings(

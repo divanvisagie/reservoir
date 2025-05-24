@@ -2,7 +2,7 @@ use crate::args::ViewSubCommand;
 use crate::clients::openai::types::Message;
 use crate::repos::message::{AnyMessageRepository, MessageRepository};
 use anyhow::Error;
-use tracing::{error, info};
+use tracing::error;
 
 pub async fn execute(
     repo: &AnyMessageRepository,

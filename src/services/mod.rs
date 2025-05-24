@@ -48,7 +48,7 @@ impl<'a> ChatRequestService<'a> {
     pub async fn find_similar_messages(
         &self,
         embedding: Vec<f32>,
-        trace_id: &str,
+        _trace_id: &str,
         partition: &str,
         instance: &str,
         top_k: usize,
@@ -120,10 +120,10 @@ impl<'a> ChatRequestService<'a> {
 
     pub(crate) async fn get_messages_for_partition(
         &self,
-        partition: Option<&str>,
+        partition: &str,
     ) -> Result<Vec<MessageNode>, Error> {
         self.message_repo
-            .get_messages_for_partition(partition)
+            .get_messages_for_partition(Some(partition))
             .await
     }
 }
