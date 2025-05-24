@@ -100,4 +100,7 @@ pub struct IngestSubCommand {
 //replay subcommand
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Replay embeddings process", long_about = None)]
-pub struct ReplaySubCommand {}
+pub struct ReplaySubCommand {
+    /// Partition to replay (defaults to "default")
+    pub model: Option<String>,
+}

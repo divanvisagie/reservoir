@@ -233,8 +233,8 @@ async fn main() -> Result<(), Error> {
         Some(SubCommands::Ingest(ref ingest_cmd)) => {
             commands::ingest::run(&message_repo, ingest_cmd).await?;
         }
-        Some(SubCommands::Replay(ref _r_cmd)) => {
-            commands::replay::run(&service).await?;
+        Some(SubCommands::Replay(ref r_cmd)) => {
+            commands::replay::run(&service, r_cmd).await?;
         }
         None => {}
     };

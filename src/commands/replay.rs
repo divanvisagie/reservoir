@@ -1,6 +1,7 @@
 use anyhow::Error;
 
 use crate::{
+    args::ReplaySubCommand,
     clients::embedding::{get_embeddings_for_txt, EmbeddingClient},
     services::ChatRequestService,
 };
@@ -32,7 +33,10 @@ pub async fn execute<'a>(service: &'a ChatRequestService<'a>, model: &str) -> Re
     Ok(())
 }
 
-pub async fn run<'a>(service: &'a ChatRequestService<'a>) -> Result<(), Error> {
+pub async fn run<'a>(
+    service: &'a ChatRequestService<'a>,
+    replay_sub_command: &ReplaySubCommand,
+) -> Result<(), Error> {
     let model = "bge-large-en-v15";
     execute(service, model).await
 }

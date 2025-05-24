@@ -3,7 +3,7 @@ use neo4rs::{query, ConfigBuilder, Graph};
 use tracing::{error, info};
 
 use crate::{
-    models::embedding_node::EmbeddingNode,
+    models::{embedding_node::EmbeddingNode, message_node::MessageNode},
     repos::config::{get_neo4j_password, get_neo4j_uri, get_neo4j_user},
 };
 
@@ -15,6 +15,12 @@ pub trait EmbeddingRepository {
         instance: &str,
         top_k: usize,
     ) -> Result<Vec<EmbeddingNode>, Error>;
+    async fn attach_embedding_to_message(
+        &self,
+        message: &MessageNode,
+        embedding: Vec<f32>,
+        model: &str,
+    ) -> Result<(), Error>;
 }
 
 pub enum AnyEmbeddingRepository {
@@ -38,6 +44,20 @@ impl EmbeddingRepository for AnyEmbeddingRepository {
         match self {
             AnyEmbeddingRepository::Neo4j(repo) => {
                 repo.find_similar_embeddings(embedding, partition, instance, top_k)
+                    .await
+            }
+        }
+    }
+
+    async fn attach_embedding_to_message(
+        &self,
+        message: &MessageNode,
+        embedding: Vec<f32>,
+        model: &str,
+    ) -> Result<(), Error> {
+        match self {
+            AnyEmbeddingRepository::Neo4j(repo) => {
+                repo.attach_embedding_to_message(message, embedding, model)
                     .await
             }
         }
@@ -114,6 +134,42 @@ impl Neo4jEmbeddingRepository {
 }
 
 impl EmbeddingRepository for Neo4jEmbeddingRepository {
+    async fn attach_embedding_to_message(
+        &self,
+        message: &MessageNode,
+        embedding: Vec<f32>,
+        model: &str,
+    ) -> Result<(), Error> {
+        let message_id = message.id.unwrap_or_default();
+        let partition = message.partition.clone();
+        let instance = message.instance.clone();
+        let timestamp = message.timestamp.clone();
+
+        let graph = self.connect().await?;
+        let q = query(
+            r#"
+            MATCH (m:Message)
+            WHERE id(m) = toInteger($message_id)
+            CREATE (e:Embedding {
+                embedding: $embedding,
+                model: $model,
+                partition: $partition,
+                instance: $instance
+            })
+            CREATE (e)-[:HAS_EMBEDDING]->(m)
+            "#,
+        )
+        .param("message_id", message_id)
+        .param("embedding", embedding)
+        .param("timestamp", timestamp)
+        .param("partition", partition)
+        .param("model", model)
+        .param("instance", instance);
+
+        graph.execute(q).await?;
+
+        Ok(())
+    }
     async fn find_similar_embeddings(
         &self,
         embedding: Vec<f32>,

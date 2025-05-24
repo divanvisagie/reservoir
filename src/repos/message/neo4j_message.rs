@@ -288,7 +288,6 @@ impl MessageRepository for Neo4jMessageRepository {
             let mut node: MessageNode = row.get("m")?;
             // Then, override its id field with the database id
             node.id = Some(row.get::<i64>("id")?);
-            info!("Found message node: {:?}", node);
             messages.push(node);
         }
 
