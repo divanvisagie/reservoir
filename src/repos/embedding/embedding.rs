@@ -143,30 +143,43 @@ impl EmbeddingRepository for Neo4jEmbeddingRepository {
         let message_id = message.id.unwrap_or_default();
         let partition = message.partition.clone();
         let instance = message.instance.clone();
+        let trace_id = message.trace_id.clone();
+        let role = message.role.clone();
         let timestamp = message.timestamp.clone();
+
+        info!("Attaching embedding to message with ID: {}", message_id);
+        info!("Model: {}", model);
+        info!("Partition: {:?}", partition);
+        info!("Instance: {:?}", instance);
+        info!("Trace ID: {}", trace_id);
+        info!("Role: {}", role);
 
         let graph = self.connect().await?;
         let q = query(
             r#"
-            MATCH (m:Message)
-            WHERE id(m) = toInteger($message_id)
+            MATCH (m:MessageNode)
+            WHERE m.trace_id = $trace_id
+            AND m.role = $role
             CREATE (e:Embedding {
                 embedding: $embedding,
                 model: $model,
                 partition: $partition,
-                instance: $instance
+                instance: $instance,
+                timestamp: $timestamp
             })
-            CREATE (e)-[:HAS_EMBEDDING]->(m)
+            CREATE (m)-[:HAS_EMBEDDING]->(e)
             "#,
         )
-        .param("message_id", message_id)
         .param("embedding", embedding)
         .param("timestamp", timestamp)
         .param("partition", partition)
         .param("model", model)
+        .param("trace_id", trace_id)
+        .param("role", role)
         .param("instance", instance);
 
-        graph.execute(q).await?;
+        let mut r = graph.execute(q).await?;
+        r.next().await?;
 
         Ok(())
     }

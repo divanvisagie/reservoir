@@ -126,4 +126,15 @@ impl<'a> ChatRequestService<'a> {
             .get_messages_for_partition(Some(partition))
             .await
     }
+
+    pub(crate) async fn attach_embedding_to_message(
+        &self,
+        message: &MessageNode,
+        embedding: Vec<f32>,
+        model: &str,
+    ) -> Result<(), Error> {
+        self.embeddings_repo
+            .attach_embedding_to_message(message, embedding, model)
+            .await
+    }
 }
